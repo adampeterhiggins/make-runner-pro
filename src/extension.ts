@@ -105,18 +105,20 @@ export function activate(context: vscode.ExtensionContext): void {
       'makeRunnerPro.editVariableValue',
       async (itemOrUri: MakeTreeItem | vscode.Uri, targetName?: string, varName?: string, defaultValue?: string) => {
         // Handle both context menu invocation (passes tree item) and direct invocation (passes args)
-        if (itemOrUri instanceof MakeTreeItem) {
-          const item = itemOrUri;
-          if (item.makefileInfo && item.target && item.variable) {
-            await treeViewProvider.editVariableValue(
-              item.makefileInfo.uri,
-              item.target.name,
-              item.variable.name,
-              item.variable.defaultValue
-            );
+        // Check if it's a tree item by looking for the makefileInfo property (avoids instanceof issues with proxies)
+        const item = itemOrUri as MakeTreeItem;
+        if (item.makefileInfo) {
+          // Extract values immediately to avoid proxy issues
+          const makefileUri = item.makefileInfo.uri;
+          const tName = item.target?.name;
+          const vName = item.variable?.name;
+          const defValue = item.variable?.defaultValue;
+
+          if (makefileUri && tName && vName) {
+            await treeViewProvider.editVariableValue(makefileUri, tName, vName, defValue);
           }
         } else if (targetName && varName) {
-          await treeViewProvider.editVariableValue(itemOrUri, targetName, varName, defaultValue);
+          await treeViewProvider.editVariableValue(itemOrUri as vscode.Uri, targetName, varName, defaultValue);
         }
       }
     )
@@ -126,12 +128,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       'makeRunnerPro.clearVariableValue',
       async (item: MakeTreeItem) => {
-        if (item.makefileInfo && item.target && item.variable) {
-          await treeViewProvider.clearVariableValue(
-            item.makefileInfo.uri,
-            item.target.name,
-            item.variable.name
-          );
+        // Extract values immediately to avoid proxy issues
+        const makefileUri = item.makefileInfo?.uri;
+        const targetName = item.target?.name;
+        const varName = item.variable?.name;
+
+        if (makefileUri && targetName && varName) {
+          await treeViewProvider.clearVariableValue(makefileUri, targetName, varName);
         }
       }
     )
