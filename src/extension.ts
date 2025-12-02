@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
-import { MakeTreeViewProvider, MakeTreeItem } from './treeViewProvider';
+import { MakeTreeViewProvider } from './treeViewProvider';
 import { MakeCodeLensProvider } from './codeLensProvider';
 import { TargetRunner } from './targetRunner';
 import { MakeTarget } from './types';
@@ -103,20 +103,17 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'makeRunnerPro.editVariableValue',
-      async (itemOrUri: MakeTreeItem | vscode.Uri, targetName?: string, varName?: string, defaultValue?: string) => {
+      async (itemOrUri: any, targetName?: string, varName?: string, defaultValue?: string) => {
         // Handle both context menu invocation (passes tree item) and direct invocation (passes args)
-        // Check if it's a tree item by looking for the makefileInfo property (avoids instanceof issues with proxies)
-        const item = itemOrUri as MakeTreeItem;
-        if (item.makefileInfo) {
-          // Extract values immediately to avoid proxy issues
-          const makefileUri = item.makefileInfo.uri;
-          const tName = item.target?.name;
-          const vName = item.variable?.name;
-          const defValue = item.variable?.defaultValue;
-
-          if (makefileUri && tName && vName) {
-            await treeViewProvider.editVariableValue(makefileUri, tName, vName, defValue);
-          }
+        // Use simple string properties to avoid proxy issues with tree items
+        if (itemOrUri.makefileUriString && itemOrUri.targetName && itemOrUri.variableName) {
+          const makefileUri = vscode.Uri.parse(itemOrUri.makefileUriString);
+          await treeViewProvider.editVariableValue(
+            makefileUri,
+            itemOrUri.targetName,
+            itemOrUri.variableName,
+            itemOrUri.variableDefaultValue
+          );
         } else if (targetName && varName) {
           await treeViewProvider.editVariableValue(itemOrUri as vscode.Uri, targetName, varName, defaultValue);
         }
@@ -127,14 +124,11 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'makeRunnerPro.clearVariableValue',
-      async (item: MakeTreeItem) => {
-        // Extract values immediately to avoid proxy issues
-        const makefileUri = item.makefileInfo?.uri;
-        const targetName = item.target?.name;
-        const varName = item.variable?.name;
-
-        if (makefileUri && targetName && varName) {
-          await treeViewProvider.clearVariableValue(makefileUri, targetName, varName);
+      async (item: any) => {
+        // Use simple string properties to avoid proxy issues with tree items
+        if (item.makefileUriString && item.targetName && item.variableName) {
+          const makefileUri = vscode.Uri.parse(item.makefileUriString);
+          await treeViewProvider.clearVariableValue(makefileUri, item.targetName, item.variableName);
         }
       }
     )
