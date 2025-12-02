@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "publisher": "make-runner-pro",
   "engines": {
     "vscode": "^1.80.0"
@@ -71,6 +71,11 @@
       {
         "command": "makeRunnerPro.toggleVariable",
         "title": "Make: Toggle Variable Selection"
+      },
+      {
+        "command": "makeRunnerPro.editVariableValue",
+        "title": "Make: Set Variable Value",
+        "icon": "$(edit)"
       }
     ],
     "menus": {
@@ -95,6 +100,11 @@
         {
           "command": "makeRunnerPro.openMakefile",
           "when": "view == makeTargets && viewItem == makefile",
+          "group": "inline"
+        },
+        {
+          "command": "makeRunnerPro.editVariableValue",
+          "when": "view == makeTargets && viewItem == variable",
           "group": "inline"
         }
       ]
@@ -146,6 +156,11 @@
           "type": "object",
           "default": {},
           "description": "Tracks which variables are selected for prompting per target"
+        },
+        "makeRunnerPro.variablePresets": {
+          "type": "object",
+          "default": {},
+          "description": "Preset values for variables per target (won't prompt at runtime)"
         },
         "makeRunnerPro.extraArguments": {
           "type": "array",

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
-import { MakefileInfo, MakeTarget, VariableInfo, VariableSelectionState } from './types';
+import { MakefileInfo, MakeTarget, VariableInfo, VariableSelectionState, VariablePresetValues } from './types';
 
 export type TreeItemType = 'makefile' | 'target' | 'variable';
 
@@ -13,7 +13,8 @@ export class MakeTreeItem extends vscode.TreeItem {
     public readonly makefileInfo?: MakefileInfo,
     public readonly target?: MakeTarget,
     public readonly variable?: VariableInfo,
-    public readonly isSelected?: boolean
+    public readonly isSelected?: boolean,
+    public readonly presetValue?: string
   ) {
     super(label, collapsibleState);
 
@@ -21,9 +22,25 @@ export class MakeTreeItem extends vscode.TreeItem {
       // Variable item (child of target)
       this.itemType = 'variable';
       this.contextValue = 'variable';
-      this.iconPath = new vscode.ThemeIcon(isSelected ? 'check' : 'circle-slash');
-      this.description = variable.defaultValue ? `= ${variable.defaultValue}` : '';
-      this.tooltip = this.createVariableTooltip(variable, isSelected ?? true);
+
+      // Determine icon and description based on selection and preset value
+      const hasPreset = presetValue !== undefined && presetValue !== '';
+      if (isSelected) {
+        this.iconPath = new vscode.ThemeIcon(hasPreset ? 'pass-filled' : 'check');
+      } else {
+        this.iconPath = new vscode.ThemeIcon('circle-slash');
+      }
+
+      // Show preset value or default value in description
+      if (hasPreset) {
+        this.description = `= "${presetValue}"`;
+      } else if (variable.defaultValue) {
+        this.description = `(default: ${variable.defaultValue})`;
+      } else {
+        this.description = '';
+      }
+
+      this.tooltip = this.createVariableTooltip(variable, isSelected ?? true, presetValue);
 
       // Toggle selection on click
       this.command = {
@@ -58,7 +75,7 @@ export class MakeTreeItem extends vscode.TreeItem {
     }
   }
 
-  private createVariableTooltip(variable: VariableInfo, isSelected: boolean): vscode.MarkdownString {
+  private createVariableTooltip(variable: VariableInfo, isSelected: boolean, presetValue?: string): vscode.MarkdownString {
     const md = new vscode.MarkdownString();
     md.appendMarkdown(`**${variable.name}**\n\n`);
 
@@ -70,8 +87,15 @@ export class MakeTreeItem extends vscode.TreeItem {
       md.appendMarkdown(`**Default:** \`${variable.defaultValue}\`\n\n`);
     }
 
-    md.appendMarkdown(`**Status:** ${isSelected ? '✓ Will be prompted' : '○ Skipped'}\n\n`);
-    md.appendMarkdown(`_Click to toggle_`);
+    const hasPreset = presetValue !== undefined && presetValue !== '';
+    if (hasPreset) {
+      md.appendMarkdown(`**Preset Value:** \`${presetValue}\`\n\n`);
+      md.appendMarkdown(`**Status:** ${isSelected ? '✓ Will use preset value (no prompt)' : '○ Skipped'}\n\n`);
+    } else {
+      md.appendMarkdown(`**Status:** ${isSelected ? '✓ Will be prompted' : '○ Skipped'}\n\n`);
+    }
+
+    md.appendMarkdown(`_Click to toggle | Right-click to set value_`);
 
     return md;
   }
@@ -105,6 +129,7 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
 
   private makefiles: MakefileInfo[] = [];
   private variableSelections: VariableSelectionState = {};
+  private variablePresets: VariablePresetValues = {};
 
   constructor(private discovery: MakefileDiscovery) {
     // Listen for makefile changes
@@ -112,8 +137,9 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
       this.refresh();
     });
 
-    // Load saved variable selections
+    // Load saved variable selections and presets
     this.loadVariableSelections();
+    this.loadVariablePresets();
   }
 
   refresh(): void {
@@ -176,6 +202,80 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     await config.update('variableSelections', this.variableSelections, vscode.ConfigurationTarget.Workspace);
   }
 
+  /**
+   * Load variable presets from workspace config
+   */
+  private loadVariablePresets(): void {
+    const config = vscode.workspace.getConfiguration('makeRunnerPro');
+    this.variablePresets = config.get<VariablePresetValues>('variablePresets', {});
+  }
+
+  /**
+   * Save variable presets to workspace config
+   */
+  private async saveVariablePresets(): Promise<void> {
+    const config = vscode.workspace.getConfiguration('makeRunnerPro');
+    await config.update('variablePresets', this.variablePresets, vscode.ConfigurationTarget.Workspace);
+  }
+
+  /**
+   * Get preset value for a variable
+   */
+  getVariablePreset(makefilePath: string, targetName: string, varName: string): string | undefined {
+    const key = this.getVariableKey(makefilePath, targetName, varName);
+    return this.variablePresets[key];
+  }
+
+  /**
+   * Set preset value for a variable
+   */
+  async setVariablePreset(makefileUri: vscode.Uri, targetName: string, varName: string, value: string): Promise<void> {
+    const key = this.getVariableKey(makefileUri.fsPath, targetName, varName);
+    if (value === '') {
+      delete this.variablePresets[key];
+    } else {
+      this.variablePresets[key] = value;
+    }
+
+    await this.saveVariablePresets();
+    this.refresh();
+  }
+
+  /**
+   * Prompt user to set a variable value
+   */
+  async editVariableValue(makefileUri: vscode.Uri, targetName: string, varName: string, defaultValue?: string): Promise<void> {
+    const key = this.getVariableKey(makefileUri.fsPath, targetName, varName);
+    const currentValue = this.variablePresets[key] ?? defaultValue ?? '';
+
+    const value = await vscode.window.showInputBox({
+      prompt: `Set value for ${varName} (leave empty to clear and prompt at runtime)`,
+      value: currentValue,
+      placeHolder: `Value for ${varName}`,
+      title: `${targetName}: ${varName}`,
+    });
+
+    if (value !== undefined) {
+      await this.setVariablePreset(makefileUri, targetName, varName, value);
+    }
+  }
+
+  /**
+   * Get all preset values for selected variables of a target
+   */
+  getPresetValuesForTarget(makefileUri: vscode.Uri, targetName: string, allVariables: VariableInfo[]): VariablePresetValues {
+    const result: VariablePresetValues = {};
+    for (const v of allVariables) {
+      if (this.isVariableSelected(makefileUri.fsPath, targetName, v.name)) {
+        const preset = this.getVariablePreset(makefileUri.fsPath, targetName, v.name);
+        if (preset !== undefined && preset !== '') {
+          result[v.name] = preset;
+        }
+      }
+    }
+    return result;
+  }
+
   async getChildren(element?: MakeTreeItem): Promise<MakeTreeItem[]> {
     if (!element) {
       // Root level - show all makefiles
@@ -212,6 +312,11 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
           element.target!.name,
           variable.name
         );
+        const presetValue = this.getVariablePreset(
+          element.makefileInfo!.uri.fsPath,
+          element.target!.name,
+          variable.name
+        );
 
         return new MakeTreeItem(
           variable.name,
@@ -219,7 +324,8 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
           element.makefileInfo,
           element.target,
           variable,
-          isSelected
+          isSelected,
+          presetValue
         );
       });
     }

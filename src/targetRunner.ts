@@ -53,17 +53,29 @@ export class TargetRunner {
       ? this.treeViewProvider.getSelectedVariables(makefileUri, targetName, target.requiredVariables)
       : target.requiredVariables;
 
-    // Check if we need to prompt for variables
+    // Get preset values for variables (these won't need prompting)
+    const presetValues = this.treeViewProvider
+      ? this.treeViewProvider.getPresetValuesForTarget(makefileUri, targetName, target.requiredVariables)
+      : {};
+
+    // Start with preset values
+    variables = { ...presetValues };
+
+    // Filter out variables that already have preset values
+    const variablesToPrompt = selectedVariables.filter(v => !(v.name in presetValues));
+
+    // Check if we need to prompt for remaining variables
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const autoPrompt = config.get<boolean>('autoPromptVariables', true);
 
-    if ((autoPrompt || forcePrompt) && selectedVariables.length > 0) {
-      const result = await this.promptForVariables(target, selectedVariables);
+    if ((autoPrompt || forcePrompt) && variablesToPrompt.length > 0) {
+      const result = await this.promptForVariables(target, variablesToPrompt);
       if (result === undefined) {
         // User cancelled
         return;
       }
-      variables = result;
+      // Merge prompted values with preset values
+      variables = { ...variables, ...result };
     }
 
     await this.executeTarget(makefileUri, targetName, variables);

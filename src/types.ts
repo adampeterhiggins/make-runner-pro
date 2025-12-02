@@ -35,5 +35,13 @@ export interface VariableSelectionState {
   [key: string]: boolean;
 }
 
+/**
+ * Stores preset values for variables per target
+ * Key format: "makefilePath::targetName::varName"
+ */
+export interface VariablePresetValues {
+  [key: string]: string;
+}
+
 
 

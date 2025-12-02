@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
-import { MakeTreeViewProvider } from './treeViewProvider';
+import { MakeTreeViewProvider, MakeTreeItem } from './treeViewProvider';
 import { MakeCodeLensProvider } from './codeLensProvider';
 import { TargetRunner } from './targetRunner';
 import { MakeTarget } from './types';
@@ -96,6 +96,28 @@ export function activate(context: vscode.ExtensionContext): void {
       'makeRunnerPro.toggleVariable',
       async (makefileUri: vscode.Uri, targetName: string, varName: string) => {
         await treeViewProvider.toggleVariable(makefileUri, targetName, varName);
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'makeRunnerPro.editVariableValue',
+      async (itemOrUri: MakeTreeItem | vscode.Uri, targetName?: string, varName?: string, defaultValue?: string) => {
+        // Handle both context menu invocation (passes tree item) and direct invocation (passes args)
+        if (itemOrUri instanceof MakeTreeItem) {
+          const item = itemOrUri;
+          if (item.makefileInfo && item.target && item.variable) {
+            await treeViewProvider.editVariableValue(
+              item.makefileInfo.uri,
+              item.target.name,
+              item.variable.name,
+              item.variable.defaultValue
+            );
+          }
+        } else if (targetName && varName) {
+          await treeViewProvider.editVariableValue(itemOrUri, targetName, varName, defaultValue);
+        }
       }
     )
   );
