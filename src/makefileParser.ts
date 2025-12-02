@@ -247,18 +247,33 @@ export class MakefileParser {
     }
 
     // Look for undefined variables used in the recipe
+    // Make built-in functions to exclude from variable detection
+    const makeFunctions = new Set([
+      'if', 'or', 'and', 'foreach', 'filter', 'filter-out', 'sort', 'word',
+      'wordlist', 'words', 'firstword', 'lastword', 'dir', 'notdir', 'suffix',
+      'basename', 'addsuffix', 'addprefix', 'join', 'wildcard', 'realpath',
+      'abspath', 'call', 'eval', 'origin', 'flavor', 'value', 'error', 'warning',
+      'info', 'shell', 'subst', 'patsubst', 'strip', 'findstring', 'file'
+    ]);
+
+    // Automatic variables to exclude
+    const autoVars = new Set([
+      '@', '<', '^', '+', '?', '*', 'MAKE', 'MAKEFLAGS', 'SHELL', 'CURDIR',
+      'MAKEFILE_LIST', 'MAKEOVERRIDES', '.VARIABLES', '.FEATURES', '.INCLUDE_DIRS'
+    ]);
+
     for (let i = recipeStart; i < recipeEnd; i++) {
       const line = lines[i];
       let match;
-      
+
       while ((match = varRefRegex.exec(line)) !== null) {
         const varName = match[1];
-        // Only add if not already defined and not a common automatic variable
-        const autoVars = ['@', '<', '^', '+', '?', '*', 'MAKE', 'MAKEFLAGS', 'SHELL'];
+        // Skip make built-in functions, automatic variables, defined vars, and already found vars
         if (
+          !makeFunctions.has(varName.toLowerCase()) &&
+          !autoVars.has(varName) &&
           !definedVarNames.has(varName) &&
-          !foundVars.has(varName) &&
-          !autoVars.includes(varName)
+          !foundVars.has(varName)
         ) {
           foundVars.add(varName);
           requiredVars.push({
