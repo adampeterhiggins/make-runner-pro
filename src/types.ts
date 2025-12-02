@@ -27,5 +27,13 @@ export interface VariablePromptResult {
   [key: string]: string;
 }
 
+/**
+ * Tracks which variables are selected for prompting per target
+ * Key format: "makefilePath::targetName::varName"
+ */
+export interface VariableSelectionState {
+  [key: string]: boolean;
+}
+
 
 

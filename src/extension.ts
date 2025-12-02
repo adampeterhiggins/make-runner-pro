@@ -19,6 +19,9 @@ export function activate(context: vscode.ExtensionContext): void {
   treeViewProvider = new MakeTreeViewProvider(discovery);
   codeLensProvider = new MakeCodeLensProvider(discovery);
 
+  // Connect target runner to tree view for variable selections
+  targetRunner.setTreeViewProvider(treeViewProvider);
+
   // Register the tree view
   const treeView = vscode.window.createTreeView('makeTargets', {
     treeDataProvider: treeViewProvider,
@@ -86,6 +89,15 @@ export function activate(context: vscode.ExtensionContext): void {
       discovery.refresh();
       treeViewProvider.refresh();
     })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      'makeRunnerPro.toggleVariable',
+      async (makefileUri: vscode.Uri, targetName: string, varName: string) => {
+        await treeViewProvider.toggleVariable(makefileUri, targetName, varName);
+      }
+    )
   );
 
   context.subscriptions.push(

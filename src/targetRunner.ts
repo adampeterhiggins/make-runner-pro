@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { MakefileDiscovery } from './makefileDiscovery';
-import { MakeTarget, VariablePromptResult } from './types';
+import { MakeTarget, VariableInfo, VariablePromptResult } from './types';
+import { MakeTreeViewProvider } from './treeViewProvider';
 
 export class TargetRunner {
   private terminals: Map<string, vscode.Terminal> = new Map();
+  private treeViewProvider?: MakeTreeViewProvider;
 
   constructor(private discovery: MakefileDiscovery) {
     // Clean up terminals when they're closed
@@ -16,6 +18,13 @@ export class TargetRunner {
         }
       }
     });
+  }
+
+  /**
+   * Set the tree view provider to access variable selections
+   */
+  setTreeViewProvider(provider: MakeTreeViewProvider): void {
+    this.treeViewProvider = provider;
   }
 
   /**
@@ -40,12 +49,17 @@ export class TargetRunner {
 
     let variables: VariablePromptResult = {};
 
+    // Get only the selected variables from the tree view
+    const selectedVariables = this.treeViewProvider
+      ? this.treeViewProvider.getSelectedVariables(makefileUri, targetName, target.requiredVariables)
+      : target.requiredVariables;
+
     // Check if we need to prompt for variables
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const autoPrompt = config.get<boolean>('autoPromptVariables', true);
 
-    if ((autoPrompt || forcePrompt) && target.requiredVariables.length > 0) {
-      const result = await this.promptForVariables(target);
+    if ((autoPrompt || forcePrompt) && selectedVariables.length > 0) {
+      const result = await this.promptForVariables(target, selectedVariables);
       if (result === undefined) {
         // User cancelled
         return;
@@ -66,13 +80,17 @@ export class TargetRunner {
   /**
    * Prompt user for required variable values
    */
-  private async promptForVariables(target: MakeTarget): Promise<VariablePromptResult | undefined> {
+  private async promptForVariables(
+    target: MakeTarget,
+    variablesToPrompt?: VariableInfo[]
+  ): Promise<VariablePromptResult | undefined> {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const savedVariables = config.get<Record<string, string>>('savedVariables', {});
 
     const variables: VariablePromptResult = {};
+    const varsToUse = variablesToPrompt ?? target.requiredVariables;
 
-    for (const varInfo of target.requiredVariables) {
+    for (const varInfo of varsToUse) {
       // Get default value: saved value > defined default > empty
       const defaultValue = savedVariables[varInfo.name] || varInfo.defaultValue || '';
 

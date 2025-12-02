@@ -268,16 +268,20 @@ export class MakefileParser {
 
       while ((match = varRefRegex.exec(line)) !== null) {
         const varName = match[1];
-        // Skip make built-in functions, automatic variables, defined vars, and already found vars
+        // Skip make built-in functions, automatic variables, and already found vars
+        // Note: We include variables defined in the makefile so users can override them
         if (
           !makeFunctions.has(varName.toLowerCase()) &&
           !autoVars.has(varName) &&
-          !definedVarNames.has(varName) &&
           !foundVars.has(varName)
         ) {
           foundVars.add(varName);
+          // Include default value if variable is defined in the makefile
+          const definedVar = definedVariables.find(v => v.name === varName);
           requiredVars.push({
             name: varName,
+            defaultValue: definedVar?.defaultValue,
+            description: definedVar?.description,
             line: i,
           });
         }
