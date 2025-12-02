@@ -209,10 +209,12 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
 
   /**
    * Load variable selections from workspace config
+   * Clone the object to avoid mutating the VS Code config proxy
    */
   private loadVariableSelections(): void {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
-    this.variableSelections = config.get<VariableSelectionState>('variableSelections', {});
+    const selections = config.get<VariableSelectionState>('variableSelections', {});
+    this.variableSelections = { ...selections };
   }
 
   /**
@@ -225,10 +227,12 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
 
   /**
    * Load variable presets from workspace config
+   * Clone the object to avoid mutating the VS Code config proxy
    */
   private loadVariablePresets(): void {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
-    this.variablePresets = config.get<VariablePresetValues>('variablePresets', {});
+    const presets = config.get<VariablePresetValues>('variablePresets', {});
+    this.variablePresets = { ...presets };
   }
 
   /**
