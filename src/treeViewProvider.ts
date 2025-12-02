@@ -248,10 +248,10 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   }
 
   /**
-   * Set preset value for a variable
+   * Set preset value for a variable (uses string path to avoid proxy issues)
    */
-  async setVariablePreset(makefileUri: vscode.Uri, targetName: string, varName: string, value: string): Promise<void> {
-    const key = this.getVariableKey(makefileUri.fsPath, targetName, varName);
+  async setVariablePreset(makefilePath: string, targetName: string, varName: string, value: string): Promise<void> {
+    const key = this.getVariableKey(makefilePath, targetName, varName);
     if (value === '') {
       delete this.variablePresets[key];
     } else {
@@ -264,10 +264,10 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   }
 
   /**
-   * Prompt user to set a variable value
+   * Prompt user to set a variable value (uses string path to avoid proxy issues)
    */
-  async editVariableValue(makefileUri: vscode.Uri, targetName: string, varName: string, defaultValue?: string): Promise<void> {
-    const key = this.getVariableKey(makefileUri.fsPath, targetName, varName);
+  async editVariableValue(makefilePath: string, targetName: string, varName: string, defaultValue?: string): Promise<void> {
+    const key = this.getVariableKey(makefilePath, targetName, varName);
     const currentValue = this.variablePresets[key] ?? defaultValue ?? '';
 
     const value = await vscode.window.showInputBox({
@@ -278,15 +278,15 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     });
 
     if (value !== undefined) {
-      await this.setVariablePreset(makefileUri, targetName, varName, value);
+      await this.setVariablePreset(makefilePath, targetName, varName, value);
     }
   }
 
   /**
-   * Clear preset value for a variable
+   * Clear preset value for a variable (uses string path to avoid proxy issues)
    */
-  async clearVariableValue(makefileUri: vscode.Uri, targetName: string, varName: string): Promise<void> {
-    await this.setVariablePreset(makefileUri, targetName, varName, '');
+  async clearVariableValue(makefilePath: string, targetName: string, varName: string): Promise<void> {
+    await this.setVariablePreset(makefilePath, targetName, varName, '');
   }
 
   /**
