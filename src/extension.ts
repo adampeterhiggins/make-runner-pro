@@ -105,17 +105,18 @@ export function activate(context: vscode.ExtensionContext): void {
       'makeRunnerPro.editVariableValue',
       async (itemOrUri: any, targetName?: string, varName?: string, defaultValue?: string) => {
         // Handle both context menu invocation (passes tree item) and direct invocation (passes args)
-        // Use simple string properties to avoid proxy issues with tree items
-        if (itemOrUri.makefileUriString && itemOrUri.targetName && itemOrUri.variableName) {
-          const makefileUri = vscode.Uri.parse(itemOrUri.makefileUriString);
-          await treeViewProvider.editVariableValue(
-            makefileUri,
-            itemOrUri.targetName,
-            itemOrUri.variableName,
-            itemOrUri.variableDefaultValue
-          );
-        } else if (targetName && varName) {
-          await treeViewProvider.editVariableValue(itemOrUri as vscode.Uri, targetName, varName, defaultValue);
+        // Extract all values to plain strings immediately to avoid any proxy issues
+        const uriString: string | undefined = itemOrUri?.makefileUriString;
+        const tName: string | undefined = itemOrUri?.targetName;
+        const vName: string | undefined = itemOrUri?.variableName;
+        const defVal: string | undefined = itemOrUri?.variableDefaultValue;
+
+        if (uriString && tName && vName) {
+          // Convert URI string to fsPath
+          const makefilePath = vscode.Uri.parse(uriString).fsPath;
+          await treeViewProvider.editVariableValue(makefilePath, tName, vName, defVal);
+        } else if (targetName && varName && typeof itemOrUri === 'string') {
+          await treeViewProvider.editVariableValue(itemOrUri, targetName, varName, defaultValue);
         }
       }
     )
@@ -125,10 +126,15 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       'makeRunnerPro.clearVariableValue',
       async (item: any) => {
-        // Use simple string properties to avoid proxy issues with tree items
-        if (item.makefileUriString && item.targetName && item.variableName) {
-          const makefileUri = vscode.Uri.parse(item.makefileUriString);
-          await treeViewProvider.clearVariableValue(makefileUri, item.targetName, item.variableName);
+        // Extract all values to plain strings immediately to avoid any proxy issues
+        const uriString: string | undefined = item?.makefileUriString;
+        const tName: string | undefined = item?.targetName;
+        const vName: string | undefined = item?.variableName;
+
+        if (uriString && tName && vName) {
+          // Convert URI string to fsPath
+          const makefilePath = vscode.Uri.parse(uriString).fsPath;
+          await treeViewProvider.clearVariableValue(makefilePath, tName, vName);
         }
       }
     )
