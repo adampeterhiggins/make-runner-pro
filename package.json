@@ -1,0 +1,172 @@
+{
+  "name": "make-runner-pro",
+  "displayName": "Make Runner Pro",
+  "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
+  "version": "1.0.0",
+  "publisher": "make-runner-pro",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "make",
+    "makefile",
+    "task runner",
+    "build"
+  ],
+  "icon": "images/icon.png",
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/[Mm]akefile",
+    "workspaceContains:**/*.mk",
+    "workspaceContains:**/GNUmakefile"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "make-runner",
+          "title": "Make Runner",
+          "icon": "images/makefile.svg"
+        }
+      ]
+    },
+    "views": {
+      "make-runner": [
+        {
+          "id": "makeTargets",
+          "name": "Makefile Targets",
+          "icon": "images/makefile.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "makeRunnerPro.runTarget",
+        "title": "Make: Run Target",
+        "icon": "$(play)"
+      },
+      {
+        "command": "makeRunnerPro.runTargetWithArgs",
+        "title": "Make: Run Target with Arguments",
+        "icon": "$(play-circle)"
+      },
+      {
+        "command": "makeRunnerPro.refresh",
+        "title": "Make: Refresh Targets",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "makeRunnerPro.openMakefile",
+        "title": "Make: Open Makefile",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "makeRunnerPro.runFromCodeLens",
+        "title": "Run Make Target"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "makeRunnerPro.refresh",
+          "when": "view == makeTargets",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "makeRunnerPro.runTarget",
+          "when": "view == makeTargets && viewItem == target",
+          "group": "inline@1"
+        },
+        {
+          "command": "makeRunnerPro.runTargetWithArgs",
+          "when": "view == makeTargets && viewItem == target",
+          "group": "inline@2"
+        },
+        {
+          "command": "makeRunnerPro.openMakefile",
+          "when": "view == makeTargets && viewItem == makefile",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Make Runner Pro",
+      "properties": {
+        "makeRunnerPro.makeExecutable": {
+          "type": "string",
+          "default": "make",
+          "description": "Path to the make executable"
+        },
+        "makeRunnerPro.filePatterns": {
+          "type": "array",
+          "default": [
+            "**/[Mm]akefile",
+            "**/*.mk",
+            "**/GNUmakefile",
+            "**/.*/[Mm]akefile",
+            "**/.*/**/*.mk"
+          ],
+          "description": "Glob patterns for discovering Makefiles"
+        },
+        "makeRunnerPro.excludePatterns": {
+          "type": "array",
+          "default": [
+            "**/node_modules/**",
+            "**/vendor/**",
+            "**/.git/**"
+          ],
+          "description": "Glob patterns to exclude from Makefile discovery"
+        },
+        "makeRunnerPro.showCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show play buttons next to Make targets in the editor"
+        },
+        "makeRunnerPro.autoPromptVariables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically prompt for required variables when running targets"
+        },
+        "makeRunnerPro.savedVariables": {
+          "type": "object",
+          "default": {},
+          "description": "Previously entered variable values (persisted for convenience)"
+        },
+        "makeRunnerPro.extraArguments": {
+          "type": "array",
+          "default": [],
+          "description": "Additional arguments to pass to make"
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "makefile",
+        "aliases": ["Makefile", "make"],
+        "extensions": [".mk"],
+        "filenames": ["Makefile", "makefile", "GNUmakefile"]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/vscode": "^1.80.0",
+    "@vscode/vsce": "^2.22.0",
+    "typescript": "^5.3.0"
+  }
+}
+
+
+
