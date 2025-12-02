@@ -124,6 +124,21 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
+      'makeRunnerPro.clearVariableValue',
+      async (item: MakeTreeItem) => {
+        if (item.makefileInfo && item.target && item.variable) {
+          await treeViewProvider.clearVariableValue(
+            item.makefileInfo.uri,
+            item.target.name,
+            item.variable.name
+          );
+        }
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
       'makeRunnerPro.openMakefile',
       async (makefileUri: vscode.Uri) => {
         const document = await vscode.workspace.openTextDocument(makefileUri);

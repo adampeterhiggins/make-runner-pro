@@ -21,10 +21,12 @@ export class MakeTreeItem extends vscode.TreeItem {
     if (variable && target && makefileInfo) {
       // Variable item (child of target)
       this.itemType = 'variable';
-      this.contextValue = 'variable';
 
       // Determine icon and description based on selection and preset value
       const hasPreset = presetValue !== undefined && presetValue !== '';
+
+      // Set context value based on whether there's a preset (for context menu visibility)
+      this.contextValue = hasPreset ? 'variableWithPreset' : 'variable';
       if (isSelected) {
         this.iconPath = new vscode.ThemeIcon(hasPreset ? 'pass-filled' : 'check');
       } else {
@@ -258,6 +260,13 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     if (value !== undefined) {
       await this.setVariablePreset(makefileUri, targetName, varName, value);
     }
+  }
+
+  /**
+   * Clear preset value for a variable
+   */
+  async clearVariableValue(makefileUri: vscode.Uri, targetName: string, varName: string): Promise<void> {
+    await this.setVariablePreset(makefileUri, targetName, varName, '');
   }
 
   /**
