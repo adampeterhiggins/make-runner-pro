@@ -137,16 +137,20 @@ export class TargetRunner {
     const makeExecutable = config.get<string>('makeExecutable', 'make');
     const extraArgs = config.get<string[]>('extraArguments', []);
 
-    const makefileDir = path.dirname(makefileUri.fsPath);
-    const makefileName = path.basename(makefileUri.fsPath);
+    // Get the workspace folder for this makefile
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(makefileUri);
+    const workspaceRoot = workspaceFolder?.uri.fsPath;
+
+    // Get the makefile path relative to workspace, or absolute if no workspace
+    const makefilePath = workspaceRoot
+      ? vscode.workspace.asRelativePath(makefileUri, false)
+      : makefileUri.fsPath;
 
     // Build the command
     const cmdParts: string[] = [makeExecutable];
 
-    // Add -f flag if not the default Makefile name in cwd
-    if (makefileName.toLowerCase() !== 'makefile' && makefileName !== 'GNUmakefile') {
-      cmdParts.push('-f', makefileName);
-    }
+    // Always use -f with the makefile path (relative to workspace root)
+    cmdParts.push('-f', makefilePath);
 
     // Add extra arguments
     cmdParts.push(...extraArgs);
@@ -163,12 +167,16 @@ export class TargetRunner {
 
     const command = cmdParts.join(' ');
 
-    // Get or create terminal
+    // Get or create terminal (runs from workspace root)
     const terminal = this.getTerminal(makefileUri);
     terminal.show();
 
-    // Change to the makefile directory and run
-    terminal.sendText(`cd "${makefileDir}" && ${command}`);
+    // Run from the workspace root directory
+    if (workspaceRoot) {
+      terminal.sendText(`cd "${workspaceRoot}" && ${command}`);
+    } else {
+      terminal.sendText(command);
+    }
   }
 
   /**
@@ -176,7 +184,7 @@ export class TargetRunner {
    */
   private getTerminal(makefileUri: vscode.Uri): vscode.Terminal {
     const key = makefileUri.toString();
-    
+
     if (this.terminals.has(key)) {
       const terminal = this.terminals.get(key)!;
       // Check if terminal is still valid
@@ -191,9 +199,12 @@ export class TargetRunner {
       ? vscode.workspace.asRelativePath(makefileUri, false)
       : path.basename(makefileUri.fsPath);
 
+    // Use workspace root as the terminal's working directory
+    const cwd = workspaceFolder?.uri.fsPath ?? path.dirname(makefileUri.fsPath);
+
     const terminal = vscode.window.createTerminal({
       name: `Make: ${relativePath}`,
-      cwd: path.dirname(makefileUri.fsPath),
+      cwd,
     });
 
     this.terminals.set(key, terminal);
