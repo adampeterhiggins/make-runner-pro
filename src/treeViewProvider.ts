@@ -7,6 +7,12 @@ export type TreeItemType = 'makefile' | 'target' | 'variable';
 export class MakeTreeItem extends vscode.TreeItem {
   public readonly itemType: TreeItemType;
 
+  // Store simple string values for command arguments (avoids proxy issues)
+  public readonly makefileUriString?: string;
+  public readonly targetName?: string;
+  public readonly variableName?: string;
+  public readonly variableDefaultValue?: string;
+
   constructor(
     public readonly label: string,
     public readonly collapsibleState: vscode.TreeItemCollapsibleState,
@@ -17,6 +23,18 @@ export class MakeTreeItem extends vscode.TreeItem {
     public readonly presetValue?: string
   ) {
     super(label, collapsibleState);
+
+    // Store simple values for easy access in commands
+    if (makefileInfo) {
+      this.makefileUriString = makefileInfo.uri.toString();
+    }
+    if (target) {
+      this.targetName = target.name;
+    }
+    if (variable) {
+      this.variableName = variable.name;
+      this.variableDefaultValue = variable.defaultValue;
+    }
 
     if (variable && target && makefileInfo) {
       // Variable item (child of target)
