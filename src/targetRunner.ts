@@ -5,17 +5,16 @@ import { MakeTarget, VariableInfo, VariablePromptResult } from './types';
 import { MakeTreeViewProvider } from './treeViewProvider';
 
 export class TargetRunner {
-  private terminals: Map<string, vscode.Terminal> = new Map();
+  private terminals: vscode.Terminal[] = [];
+  private terminalCounter = 0;
   private treeViewProvider?: MakeTreeViewProvider;
 
   constructor(private discovery: MakefileDiscovery) {
     // Clean up terminals when they're closed
     vscode.window.onDidCloseTerminal((terminal) => {
-      for (const [key, term] of this.terminals.entries()) {
-        if (term === terminal) {
-          this.terminals.delete(key);
-          break;
-        }
+      const index = this.terminals.indexOf(terminal);
+      if (index !== -1) {
+        this.terminals.splice(index, 1);
       }
     });
   }
@@ -167,8 +166,8 @@ export class TargetRunner {
 
     const command = cmdParts.join(' ');
 
-    // Get or create terminal (runs from workspace root)
-    const terminal = this.getTerminal(makefileUri);
+    // Create a new terminal for this run
+    const terminal = this.createTerminal(makefileUri, targetName);
     terminal.show();
 
     // Run from the workspace root directory
@@ -180,20 +179,9 @@ export class TargetRunner {
   }
 
   /**
-   * Get or create a terminal for a makefile
+   * Create a new terminal for running a make target
    */
-  private getTerminal(makefileUri: vscode.Uri): vscode.Terminal {
-    const key = makefileUri.toString();
-
-    if (this.terminals.has(key)) {
-      const terminal = this.terminals.get(key)!;
-      // Check if terminal is still valid
-      if (vscode.window.terminals.includes(terminal)) {
-        return terminal;
-      }
-      this.terminals.delete(key);
-    }
-
+  private createTerminal(makefileUri: vscode.Uri, targetName: string): vscode.Terminal {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(makefileUri);
     const relativePath = workspaceFolder
       ? vscode.workspace.asRelativePath(makefileUri, false)
@@ -202,12 +190,15 @@ export class TargetRunner {
     // Use workspace root as the terminal's working directory
     const cwd = workspaceFolder?.uri.fsPath ?? path.dirname(makefileUri.fsPath);
 
+    // Increment counter for unique terminal names
+    this.terminalCounter++;
+
     const terminal = vscode.window.createTerminal({
-      name: `Make: ${relativePath}`,
+      name: `Make #${this.terminalCounter}: ${targetName}`,
       cwd,
     });
 
-    this.terminals.set(key, terminal);
+    this.terminals.push(terminal);
     return terminal;
   }
 
@@ -230,10 +221,10 @@ export class TargetRunner {
 
   dispose(): void {
     // Close all terminals
-    for (const terminal of this.terminals.values()) {
+    for (const terminal of this.terminals) {
       terminal.dispose();
     }
-    this.terminals.clear();
+    this.terminals = [];
   }
 }
 
