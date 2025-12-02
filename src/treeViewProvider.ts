@@ -194,7 +194,8 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     this.variableSelections[key] = !currentValue;
 
     await this.saveVariableSelections();
-    this.refresh();
+    // Use setTimeout to break out of any proxy context before refreshing
+    setTimeout(() => this.refresh(), 0);
   }
 
   /**
@@ -258,7 +259,8 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     }
 
     await this.saveVariablePresets();
-    this.refresh();
+    // Use setTimeout to break out of any proxy context before refreshing
+    setTimeout(() => this.refresh(), 0);
   }
 
   /**
