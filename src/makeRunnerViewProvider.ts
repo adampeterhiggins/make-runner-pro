@@ -135,10 +135,10 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);
       color: var(--vscode-foreground);
-      line-height: 22px;
+      padding: 0;
     }
     .search-container {
-      padding: 4px 8px 4px 8px;
+      padding: 8px;
       position: sticky;
       top: 0;
       background: var(--vscode-sideBar-background);
@@ -148,10 +148,10 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
       width: 100%;
       background: var(--vscode-input-background);
       border: 1px solid var(--vscode-input-border, transparent);
+      border-radius: 2px;
       color: var(--vscode-input-foreground);
-      padding: 3px 6px;
-      font-size: var(--vscode-font-size);
-      font-family: var(--vscode-font-family);
+      padding: 4px 8px;
+      font-size: 13px;
       outline: none;
     }
     .search-input:focus {
@@ -161,66 +161,51 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
       color: var(--vscode-input-placeholderForeground);
     }
     .tree {
-      outline: none;
+      padding: 0 0 8px 0;
     }
     .tree-item {
       display: flex;
       align-items: center;
-      height: 22px;
-      padding-right: 12px;
+      padding: 4px 8px;
       cursor: pointer;
       user-select: none;
     }
     .tree-item:hover {
       background: var(--vscode-list-hoverBackground);
     }
-    .indent {
-      display: inline-block;
-      width: 8px;
-      flex-shrink: 0;
+    .tree-item.makefile {
+      padding-left: 8px;
     }
-    .twistie {
+    .tree-item.target {
+      padding-left: 24px;
+    }
+    .tree-item.variable {
+      padding-left: 44px;
+    }
+    .chevron {
       width: 16px;
-      height: 22px;
+      height: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
+      margin-right: 4px;
+      font-size: 10px;
       color: var(--vscode-foreground);
+      opacity: 0.7;
     }
-    .twistie.collapsed::before {
-      content: '';
-      border: 4px solid transparent;
-      border-left-color: var(--vscode-foreground);
-      border-left-width: 5px;
-      margin-left: 3px;
+    .chevron.expanded {
+      transform: rotate(90deg);
     }
-    .twistie.expanded::before {
-      content: '';
-      border: 4px solid transparent;
-      border-top-color: var(--vscode-foreground);
-      border-top-width: 5px;
-      margin-top: 3px;
-    }
-    .twistie.hidden {
+    .chevron.hidden {
       visibility: hidden;
     }
     .icon {
       width: 16px;
-      height: 22px;
+      height: 16px;
+      margin-right: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
-      margin-right: 6px;
-      font-size: 16px;
-      color: var(--vscode-symbolIcon-fileForeground, var(--vscode-foreground));
-    }
-    .icon.target {
-      color: var(--vscode-symbolIcon-functionForeground, #b180d7);
-    }
-    .icon.variable {
-      color: var(--vscode-symbolIcon-variableForeground, #75beff);
     }
     .label {
       flex: 1;
@@ -230,41 +215,38 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
     }
     .description {
       color: var(--vscode-descriptionForeground);
-      margin-left: 6px;
       font-size: 0.9em;
-      opacity: 0.8;
-      flex-shrink: 0;
+      margin-left: 8px;
     }
     .actions {
       display: none;
-      margin-left: 4px;
-      flex-shrink: 0;
+      gap: 4px;
     }
     .tree-item:hover .actions {
       display: flex;
     }
-    .tree-item:hover .description.hide-on-hover {
-      display: none;
-    }
     .action-btn {
-      width: 22px;
-      height: 22px;
       background: transparent;
       border: none;
       color: var(--vscode-foreground);
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      padding: 2px 4px;
       border-radius: 3px;
-      font-size: 14px;
+      font-size: 12px;
+      opacity: 0.7;
     }
     .action-btn:hover {
       background: var(--vscode-toolbar-hoverBackground);
+      opacity: 1;
     }
     .empty-message {
-      padding: 10px 20px;
+      padding: 16px;
+      text-align: center;
       color: var(--vscode-descriptionForeground);
+    }
+    .codicon {
+      font-family: codicon;
+      font-size: 14px;
     }
   </style>
 </head>
@@ -272,39 +254,24 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
   <div class="search-container">
     <input type="text" class="search-input" id="searchInput" placeholder="Filter targets..." value="${this.escapeHtml(this.filterQuery)}" />
   </div>
-  <div class="tree" id="tree">
+  <div class="tree">
     ${this.renderTree(filteredMakefiles)}
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
+
     const searchInput = document.getElementById('searchInput');
-    const tree = document.getElementById('tree');
     let debounceTimer;
-    let savedSelection = { start: 0, end: 0 };
 
-    // Save cursor position before filter
     searchInput.addEventListener('input', (e) => {
-      savedSelection.start = searchInput.selectionStart;
-      savedSelection.end = searchInput.selectionEnd;
-
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
         vscode.postMessage({ type: 'filter', query: e.target.value });
-      }, 200);
+      }, 150);
     });
 
-    // Restore focus after tree updates
-    const observer = new MutationObserver(() => {
-      if (document.activeElement !== searchInput && searchInput.value) {
-        searchInput.focus();
-        searchInput.setSelectionRange(savedSelection.start, savedSelection.end);
-      }
-    });
-    observer.observe(tree, { childList: true, subtree: true });
-
-    // Handle tree item clicks
-    tree.addEventListener('click', (e) => {
+    document.addEventListener('click', (e) => {
       const item = e.target.closest('.tree-item');
       if (!item) return;
 
@@ -359,14 +326,13 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
       const targetCount = mf.targets.length;
 
       html += `
-        <div class="tree-item" data-type="makefile" data-item='${JSON.stringify({ path: mf.uri.toString() })}'>
-          <span class="indent"></span>
-          <span class="twistie ${isExpanded ? 'expanded' : 'collapsed'}"></span>
-          <span class="icon">📄</span>
+        <div class="tree-item makefile" data-type="makefile" data-item='${JSON.stringify({ path: mf.uri.toString() })}'>
+          <span class="chevron ${isExpanded ? 'expanded' : ''}">&#9654;</span>
+          <span class="icon">&#128196;</span>
           <span class="label">${this.escapeHtml(mf.relativePath)}</span>
-          <span class="description hide-on-hover">${targetCount} targets</span>
+          <span class="description">${targetCount} targets</span>
           <div class="actions">
-            <button class="action-btn" data-action="open" title="Open Makefile">📂</button>
+            <button class="action-btn" data-action="open" title="Open Makefile">&#128269;</button>
           </div>
         </div>
       `;
@@ -386,7 +352,7 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
     }
 
     if (targets.length === 0) {
-      return `<div class="tree-item"><span class="indent"></span><span class="indent"></span><span class="indent"></span><span class="label" style="color: var(--vscode-descriptionForeground)">No matching targets</span></div>`;
+      return `<div class="tree-item target"><span class="label" style="color: var(--vscode-descriptionForeground)">No matching targets</span></div>`;
     }
 
     // Sort: phony first, then alphabetically
@@ -411,16 +377,15 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
       };
 
       html += `
-        <div class="tree-item" data-type="target" data-item='${JSON.stringify(itemData)}'>
-          <span class="indent"></span>
-          <span class="indent"></span>
-          <span class="twistie ${hasVars ? (isExpanded ? 'expanded' : 'collapsed') : 'hidden'}"></span>
-          <span class="icon target">▶</span>
+        <div class="tree-item target" data-type="target" data-item='${JSON.stringify(itemData)}'>
+          <span class="chevron ${hasVars ? (isExpanded ? 'expanded' : '') : 'hidden'}">&#9654;</span>
+          <span class="icon">${hasVars ? '&#9655;' : '&#9654;'}</span>
           <span class="label">${this.escapeHtml(target.name)}</span>
-          ${hasVars ? `<span class="description hide-on-hover">(${selectedCount}/${target.requiredVariables.length} vars)</span>` : ''}
+          ${hasVars ? `<span class="description">(${selectedCount}/${target.requiredVariables.length} vars)</span>` : ''}
+          ${target.isPhony ? `<span class="description">phony</span>` : ''}
           <div class="actions">
-            <button class="action-btn" data-action="run" title="Run">▶</button>
-            ${hasVars ? `<button class="action-btn" data-action="runWithArgs" title="Run with args">⚙</button>` : ''}
+            <button class="action-btn" data-action="run" title="Run">&#9654;</button>
+            ${hasVars ? `<button class="action-btn" data-action="runWithArgs" title="Run with args">&#9881;</button>` : ''}
           </div>
         </div>
       `;
@@ -453,20 +418,17 @@ export class MakeRunnerViewProvider implements vscode.WebviewViewProvider {
         description = `(default: ${this.escapeHtml(variable.defaultValue)})`;
       }
 
-      const icon = isSelected ? '☑' : '☐';
+      const icon = isSelected ? (hasPreset ? '&#9745;' : '&#9745;') : '&#9744;';
 
       html += `
-        <div class="tree-item" data-type="variable" data-item='${JSON.stringify(itemData)}'>
-          <span class="indent"></span>
-          <span class="indent"></span>
-          <span class="indent"></span>
-          <span class="twistie hidden"></span>
-          <span class="icon variable">${icon}</span>
+        <div class="tree-item variable" data-type="variable" data-item='${JSON.stringify(itemData)}'>
+          <span class="chevron hidden">&#9654;</span>
+          <span class="icon">${icon}</span>
           <span class="label">${this.escapeHtml(variable.name)}</span>
-          ${description ? `<span class="description hide-on-hover">${description}</span>` : ''}
+          ${description ? `<span class="description">${description}</span>` : ''}
           <div class="actions">
-            <button class="action-btn" data-action="edit" title="Set value">✎</button>
-            ${hasPreset ? `<button class="action-btn" data-action="clear" title="Clear value">✕</button>` : ''}
+            <button class="action-btn" data-action="edit" title="Set value">&#9998;</button>
+            ${hasPreset ? `<button class="action-btn" data-action="clear" title="Clear value">&#10005;</button>` : ''}
           </div>
         </div>
       `;
