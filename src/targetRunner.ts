@@ -2,12 +2,12 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { MakefileDiscovery } from './makefileDiscovery';
 import { MakeTarget, VariableInfo, VariablePromptResult } from './types';
-import { MakeRunnerViewProvider } from './makeRunnerViewProvider';
+import { MakeTreeViewProvider } from './treeViewProvider';
 
 export class TargetRunner {
   private terminals: vscode.Terminal[] = [];
   private terminalCounter = 0;
-  private viewProvider?: MakeRunnerViewProvider;
+  private treeViewProvider?: MakeTreeViewProvider;
 
   constructor(private discovery: MakefileDiscovery) {
     // Clean up terminals when they're closed
@@ -20,10 +20,10 @@ export class TargetRunner {
   }
 
   /**
-   * Set the view provider to access variable selections
+   * Set the tree view provider to access variable selections
    */
-  setViewProvider(provider: MakeRunnerViewProvider): void {
-    this.viewProvider = provider;
+  setTreeViewProvider(provider: MakeTreeViewProvider): void {
+    this.treeViewProvider = provider;
   }
 
   /**
@@ -48,14 +48,14 @@ export class TargetRunner {
 
     let variables: VariablePromptResult = {};
 
-    // Get only the selected variables from the view provider
-    const selectedVariables = this.viewProvider
-      ? this.viewProvider.getSelectedVariables(makefileUri, targetName, target.requiredVariables)
+    // Get only the selected variables from the tree view
+    const selectedVariables = this.treeViewProvider
+      ? this.treeViewProvider.getSelectedVariables(makefileUri, targetName, target.requiredVariables)
       : target.requiredVariables;
 
     // Get preset values for variables (these won't need prompting)
-    const presetValues = this.viewProvider
-      ? this.viewProvider.getPresetValuesForTarget(makefileUri, targetName, target.requiredVariables)
+    const presetValues = this.treeViewProvider
+      ? this.treeViewProvider.getPresetValuesForTarget(makefileUri, targetName, target.requiredVariables)
       : {};
 
     // Start with preset values

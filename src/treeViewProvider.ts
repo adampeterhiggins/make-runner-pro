@@ -167,34 +167,53 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     this._onDidChangeTreeData.fire();
   }
 
+  /**
+   * Set the filter query and refresh the tree
+   */
   setFilter(query: string): void {
     this.filterQuery = query.toLowerCase();
     this.refresh();
   }
 
+  /**
+   * Get the current filter query
+   */
   getFilter(): string {
     return this.filterQuery;
   }
 
+  /**
+   * Clear the filter and refresh the tree
+   */
   clearFilter(): void {
     this.filterQuery = '';
     this.refresh();
   }
 
+  /**
+   * Check if the filter is active
+   */
   private isFilterActive(): boolean {
     return this.filterQuery.length > 0;
   }
 
+  /**
+   * Check if a target matches the current filter
+   */
   private targetMatchesFilter(target: MakeTarget): boolean {
     if (!this.isFilterActive()) {
       return true;
     }
+    // Case-insensitive match against target name or description
     return (
       target.name.toLowerCase().includes(this.filterQuery) ||
       (target.description?.toLowerCase().includes(this.filterQuery) ?? false)
     );
   }
 
+  /**
+   * Check if a makefile has any targets matching the filter
+   */
   private makefileHasMatchingTargets(makefile: MakefileInfo): boolean {
     if (!this.isFilterActive()) {
       return true;
