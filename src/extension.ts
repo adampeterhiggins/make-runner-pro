@@ -29,26 +29,6 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   context.subscriptions.push(treeView);
 
-  // Register filter commands
-  context.subscriptions.push(
-    vscode.commands.registerCommand('makeRunnerPro.filterTargets', async () => {
-      const query = await vscode.window.showInputBox({
-        prompt: 'Filter Make targets',
-        placeHolder: 'Enter search query...',
-        value: treeViewProvider.getFilter(),
-      });
-      if (query !== undefined) {
-        treeViewProvider.setFilter(query);
-      }
-    })
-  );
-
-  context.subscriptions.push(
-    vscode.commands.registerCommand('makeRunnerPro.clearFilter', () => {
-      treeViewProvider.clearFilter();
-    })
-  );
-
   // Register CodeLens provider for makefiles
   const codeLensDisposable = vscode.languages.registerCodeLensProvider(
     [
