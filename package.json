@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "make-runner-pro",
   "engines": {
     "vscode": "^1.80.0"
@@ -37,6 +37,7 @@
     "views": {
       "make-runner": [
         {
+          "type": "webview",
           "id": "makeTargets",
           "name": "Targets",
           "icon": "images/makefile.svg"
@@ -81,34 +82,14 @@
         "command": "makeRunnerPro.clearVariableValue",
         "title": "Make: Clear Variable Value",
         "icon": "$(close)"
-      },
-      {
-        "command": "makeRunnerPro.clearFilter",
-        "title": "Make: Clear Filter",
-        "icon": "$(clear-all)"
-      },
-      {
-        "command": "makeRunnerPro.filterTargets",
-        "title": "Make: Filter Targets",
-        "icon": "$(search)"
       }
     ],
     "menus": {
       "view/title": [
         {
-          "command": "makeRunnerPro.filterTargets",
-          "when": "view == makeTargets",
-          "group": "navigation@1"
-        },
-        {
-          "command": "makeRunnerPro.clearFilter",
-          "when": "view == makeTargets",
-          "group": "navigation@2"
-        },
-        {
           "command": "makeRunnerPro.refresh",
           "when": "view == makeTargets",
-          "group": "navigation@3"
+          "group": "navigation"
         }
       ],
       "view/item/context": [

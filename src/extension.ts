@@ -1,15 +1,14 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
-import { MakeTreeViewProvider } from './treeViewProvider';
+import { MakeRunnerViewProvider } from './makeRunnerViewProvider';
 import { MakeCodeLensProvider } from './codeLensProvider';
 import { TargetRunner } from './targetRunner';
 import { MakeTarget } from './types';
 
 let discovery: MakefileDiscovery;
-let treeViewProvider: MakeTreeViewProvider;
+let viewProvider: MakeRunnerViewProvider;
 let codeLensProvider: MakeCodeLensProvider;
 let targetRunner: TargetRunner;
-let filterInputBox: vscode.InputBox | undefined;
 
 export function activate(context: vscode.ExtensionContext): void {
   console.log('Make Runner Pro is now active!');
@@ -17,56 +16,18 @@ export function activate(context: vscode.ExtensionContext): void {
   // Initialize core components
   discovery = new MakefileDiscovery();
   targetRunner = new TargetRunner(discovery);
-  treeViewProvider = new MakeTreeViewProvider(discovery);
+  viewProvider = new MakeRunnerViewProvider(context.extensionUri, discovery);
   codeLensProvider = new MakeCodeLensProvider(discovery);
 
-  // Connect target runner to tree view for variable selections
-  targetRunner.setTreeViewProvider(treeViewProvider);
+  // Connect target runner to view provider for variable selections
+  targetRunner.setViewProvider(viewProvider);
 
-  // Register the tree view
-  const treeView = vscode.window.createTreeView('makeTargets', {
-    treeDataProvider: treeViewProvider,
-    showCollapseAll: true,
-  });
-  context.subscriptions.push(treeView);
-
-  // Create persistent filter input box
-  filterInputBox = vscode.window.createInputBox();
-  filterInputBox.placeholder = 'Filter targets...';
-  filterInputBox.title = 'Filter Make Targets';
-
-  filterInputBox.onDidChangeValue((value) => {
-    treeViewProvider.setFilter(value);
-  });
-
-  filterInputBox.onDidAccept(() => {
-    filterInputBox?.hide();
-  });
-
-  filterInputBox.onDidHide(() => {
-    // Keep filter active even when input is hidden
-  });
-
-  context.subscriptions.push(filterInputBox);
-
-  // Register filter command to show the input box
+  // Register the webview view provider
   context.subscriptions.push(
-    vscode.commands.registerCommand('makeRunnerPro.filterTargets', () => {
-      if (filterInputBox) {
-        filterInputBox.value = treeViewProvider.getFilter();
-        filterInputBox.show();
-      }
-    })
-  );
-
-  // Register clear filter command
-  context.subscriptions.push(
-    vscode.commands.registerCommand('makeRunnerPro.clearFilter', () => {
-      if (filterInputBox) {
-        filterInputBox.value = '';
-      }
-      treeViewProvider.clearFilter();
-    })
+    vscode.window.registerWebviewViewProvider(
+      MakeRunnerViewProvider.viewType,
+      viewProvider
+    )
   );
 
   // Register CodeLens provider for makefiles
@@ -127,7 +88,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand('makeRunnerPro.refresh', () => {
       discovery.refresh();
-      treeViewProvider.refresh();
+      viewProvider.refresh();
     })
   );
 
@@ -135,7 +96,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       'makeRunnerPro.toggleVariable',
       async (makefileUri: vscode.Uri, targetName: string, varName: string) => {
-        await treeViewProvider.toggleVariable(makefileUri, targetName, varName);
+        await viewProvider.toggleVariable(makefileUri.fsPath, targetName, varName);
       }
     )
   );
@@ -145,18 +106,16 @@ export function activate(context: vscode.ExtensionContext): void {
       'makeRunnerPro.editVariableValue',
       async (itemOrUri: any, targetName?: string, varName?: string, defaultValue?: string) => {
         // Handle both context menu invocation (passes tree item) and direct invocation (passes args)
-        // Extract all values to plain strings immediately to avoid any proxy issues
         const uriString: string | undefined = itemOrUri?.makefileUriString;
         const tName: string | undefined = itemOrUri?.targetName;
         const vName: string | undefined = itemOrUri?.variableName;
         const defVal: string | undefined = itemOrUri?.variableDefaultValue;
 
         if (uriString && tName && vName) {
-          // Convert URI string to fsPath
           const makefilePath = vscode.Uri.parse(uriString).fsPath;
-          await treeViewProvider.editVariableValue(makefilePath, tName, vName, defVal);
+          await viewProvider.editVariableValue(makefilePath, tName, vName, defVal);
         } else if (targetName && varName && typeof itemOrUri === 'string') {
-          await treeViewProvider.editVariableValue(itemOrUri, targetName, varName, defaultValue);
+          await viewProvider.editVariableValue(itemOrUri, targetName, varName, defaultValue);
         }
       }
     )
@@ -166,15 +125,13 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(
       'makeRunnerPro.clearVariableValue',
       async (item: any) => {
-        // Extract all values to plain strings immediately to avoid any proxy issues
         const uriString: string | undefined = item?.makefileUriString;
         const tName: string | undefined = item?.targetName;
         const vName: string | undefined = item?.variableName;
 
         if (uriString && tName && vName) {
-          // Convert URI string to fsPath
           const makefilePath = vscode.Uri.parse(uriString).fsPath;
-          await treeViewProvider.clearVariableValue(makefilePath, tName, vName);
+          await viewProvider.clearVariableValue(makefilePath, tName, vName);
         }
       }
     )
@@ -194,14 +151,14 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push({
     dispose: () => {
       discovery.dispose();
-      treeViewProvider.dispose();
+      viewProvider.dispose();
       codeLensProvider.dispose();
       targetRunner.dispose();
     },
   });
 
   // Initial refresh
-  treeViewProvider.refresh();
+  viewProvider.refresh();
 }
 
 /**
