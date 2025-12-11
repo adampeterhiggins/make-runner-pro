@@ -4,11 +4,13 @@ import { MakeTreeViewProvider } from './treeViewProvider';
 import { MakeCodeLensProvider } from './codeLensProvider';
 import { TargetRunner } from './targetRunner';
 import { MakeTarget } from './types';
+import { SearchViewProvider } from './searchViewProvider';
 
 let discovery: MakefileDiscovery;
 let treeViewProvider: MakeTreeViewProvider;
 let codeLensProvider: MakeCodeLensProvider;
 let targetRunner: TargetRunner;
+let searchViewProvider: SearchViewProvider;
 
 export function activate(context: vscode.ExtensionContext): void {
   console.log('Make Runner Pro is now active!');
@@ -22,6 +24,20 @@ export function activate(context: vscode.ExtensionContext): void {
   // Connect target runner to tree view for variable selections
   targetRunner.setTreeViewProvider(treeViewProvider);
 
+  // Register the search view provider
+  searchViewProvider = new SearchViewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      SearchViewProvider.viewType,
+      searchViewProvider
+    )
+  );
+
+  // Connect search to tree view
+  searchViewProvider.onDidChangeSearch((options) => {
+    treeViewProvider.setSearchOptions(options);
+  });
+
   // Register the tree view
   const treeView = vscode.window.createTreeView('makeTargets', {
     treeDataProvider: treeViewProvider,
@@ -29,22 +45,10 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   context.subscriptions.push(treeView);
 
-  // Register filter commands
-  context.subscriptions.push(
-    vscode.commands.registerCommand('makeRunnerPro.filterTargets', async () => {
-      const query = await vscode.window.showInputBox({
-        prompt: 'Filter Make targets',
-        placeHolder: 'Enter search query...',
-        value: treeViewProvider.getFilter(),
-      });
-      if (query !== undefined) {
-        treeViewProvider.setFilter(query);
-      }
-    })
-  );
-
+  // Register clear filter command
   context.subscriptions.push(
     vscode.commands.registerCommand('makeRunnerPro.clearFilter', () => {
+      searchViewProvider.clearSearch();
       treeViewProvider.clearFilter();
     })
   );
