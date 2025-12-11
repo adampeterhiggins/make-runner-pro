@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
 import { MakefileInfo, MakeTarget, VariableInfo, VariableSelectionState, VariablePresetValues } from './types';
-import { SearchOptions } from './searchViewProvider';
 
 export type TreeItemType = 'makefile' | 'target' | 'variable';
 
@@ -151,12 +150,7 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   private makefiles: MakefileInfo[] = [];
   private variableSelections: VariableSelectionState = {};
   private variablePresets: VariablePresetValues = {};
-  private searchOptions: SearchOptions = {
-    query: '',
-    caseSensitive: false,
-    wholeWord: false,
-    useRegex: false,
-  };
+  private filterQuery: string = '';
 
   constructor(private discovery: MakefileDiscovery) {
     // Listen for makefile changes
@@ -174,10 +168,10 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   }
 
   /**
-   * Set the search options and refresh the tree
+   * Set the filter query and refresh the tree
    */
-  setSearchOptions(options: SearchOptions): void {
-    this.searchOptions = options;
+  setFilter(query: string): void {
+    this.filterQuery = query.toLowerCase();
     this.refresh();
   }
 
@@ -185,63 +179,36 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
    * Clear the filter and refresh the tree
    */
   clearFilter(): void {
-    this.searchOptions = {
-      query: '',
-      caseSensitive: false,
-      wholeWord: false,
-      useRegex: false,
-    };
+    this.filterQuery = '';
     this.refresh();
   }
 
   /**
-   * Check if the filter is active
+   * Get the current filter query
    */
-  private isFilterActive(): boolean {
-    return this.searchOptions.query.length > 0;
+  getFilter(): string {
+    return this.filterQuery;
   }
 
   /**
    * Check if a target matches the current filter
    */
   private targetMatchesFilter(target: MakeTarget): boolean {
-    if (!this.isFilterActive()) {
+    if (!this.filterQuery) {
       return true;
     }
-
-    const { query, caseSensitive, wholeWord, useRegex } = this.searchOptions;
-
-    // Build the search pattern
-    let pattern: RegExp;
-    try {
-      if (useRegex) {
-        pattern = new RegExp(query, caseSensitive ? '' : 'i');
-      } else if (wholeWord) {
-        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        pattern = new RegExp(`\\b${escaped}\\b`, caseSensitive ? '' : 'i');
-      } else {
-        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        pattern = new RegExp(escaped, caseSensitive ? '' : 'i');
-      }
-    } catch {
-      // Invalid regex - fall back to simple includes
-      const searchQuery = caseSensitive ? query : query.toLowerCase();
-      const targetName = caseSensitive ? target.name : target.name.toLowerCase();
-      const targetDesc = caseSensitive
-        ? (target.description ?? '')
-        : (target.description?.toLowerCase() ?? '');
-      return targetName.includes(searchQuery) || targetDesc.includes(searchQuery);
-    }
-
     // Match against target name or description
-    return pattern.test(target.name) || (target.description ? pattern.test(target.description) : false);
+    return (
+      target.name.toLowerCase().includes(this.filterQuery) ||
+      (target.description?.toLowerCase().includes(this.filterQuery) ?? false)
+    );
   }
 
   /**
    * Check if a makefile has any targets matching the filter
    */
   private makefileHasMatchingTargets(makefile: MakefileInfo): boolean {
-    if (!this.isFilterActive()) {
+    if (!this.filterQuery) {
       return true;
     }
     return makefile.targets.some(t => this.targetMatchesFilter(t));
@@ -405,7 +372,7 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
       }
 
       // Filter makefiles that have matching targets (if filter is active)
-      const filteredMakefiles = this.isFilterActive()
+      const filteredMakefiles = this.filterQuery
         ? this.makefiles.filter(mf => this.makefileHasMatchingTargets(mf))
         : this.makefiles;
 
@@ -419,7 +386,7 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
       }
 
       // If only one makefile or filter is active, expand by default
-      const shouldExpand = filteredMakefiles.length === 1 || this.isFilterActive();
+      const shouldExpand = filteredMakefiles.length === 1 || this.filterQuery;
       const collapsedState = shouldExpand
         ? vscode.TreeItemCollapsibleState.Expanded
         : vscode.TreeItemCollapsibleState.Collapsed;
@@ -463,14 +430,14 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
       let targets = element.makefileInfo.targets;
 
       // Filter targets if search is active
-      if (this.isFilterActive()) {
+      if (this.filterQuery) {
         targets = targets.filter(t => this.targetMatchesFilter(t));
       }
 
       if (targets.length === 0) {
         return [
           new MakeTreeItem(
-            this.isFilterActive() ? 'No matching targets' : 'No targets found',
+            this.filterQuery ? 'No matching targets' : 'No targets found',
             vscode.TreeItemCollapsibleState.None
           ),
         ];
