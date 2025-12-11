@@ -4,12 +4,13 @@ import { MakeTreeViewProvider } from './treeViewProvider';
 import { MakeCodeLensProvider } from './codeLensProvider';
 import { TargetRunner } from './targetRunner';
 import { MakeTarget } from './types';
+import { SearchViewProvider } from './searchViewProvider';
 
 let discovery: MakefileDiscovery;
 let treeViewProvider: MakeTreeViewProvider;
 let codeLensProvider: MakeCodeLensProvider;
 let targetRunner: TargetRunner;
-let filterInputBox: vscode.InputBox | undefined;
+let searchViewProvider: SearchViewProvider;
 
 export function activate(context: vscode.ExtensionContext): void {
   console.log('Make Runner Pro is now active!');
@@ -23,6 +24,20 @@ export function activate(context: vscode.ExtensionContext): void {
   // Connect target runner to tree view for variable selections
   targetRunner.setTreeViewProvider(treeViewProvider);
 
+  // Register the search view provider
+  searchViewProvider = new SearchViewProvider(context.extensionUri);
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      SearchViewProvider.viewType,
+      searchViewProvider
+    )
+  );
+
+  // Connect search to tree view
+  searchViewProvider.onDidChangeSearch((options) => {
+    treeViewProvider.setSearchOptions(options);
+  });
+
   // Register the tree view
   const treeView = vscode.window.createTreeView('makeTargets', {
     treeDataProvider: treeViewProvider,
@@ -30,41 +45,10 @@ export function activate(context: vscode.ExtensionContext): void {
   });
   context.subscriptions.push(treeView);
 
-  // Create persistent filter input box
-  filterInputBox = vscode.window.createInputBox();
-  filterInputBox.placeholder = 'Filter targets...';
-  filterInputBox.title = 'Filter Make Targets';
-
-  filterInputBox.onDidChangeValue((value) => {
-    treeViewProvider.setFilter(value);
-  });
-
-  filterInputBox.onDidAccept(() => {
-    filterInputBox?.hide();
-  });
-
-  filterInputBox.onDidHide(() => {
-    // Keep filter active even when input is hidden
-  });
-
-  context.subscriptions.push(filterInputBox);
-
-  // Register filter command to show the input box
-  context.subscriptions.push(
-    vscode.commands.registerCommand('makeRunnerPro.filterTargets', () => {
-      if (filterInputBox) {
-        filterInputBox.value = treeViewProvider.getFilter();
-        filterInputBox.show();
-      }
-    })
-  );
-
   // Register clear filter command
   context.subscriptions.push(
     vscode.commands.registerCommand('makeRunnerPro.clearFilter', () => {
-      if (filterInputBox) {
-        filterInputBox.value = '';
-      }
+      searchViewProvider.clearSearch();
       treeViewProvider.clearFilter();
     })
   );

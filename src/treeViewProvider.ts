@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
 import { MakefileInfo, MakeTarget, VariableInfo, VariableSelectionState, VariablePresetValues } from './types';
+import { SearchOptions } from './searchViewProvider';
 
 export type TreeItemType = 'makefile' | 'target' | 'variable';
 
@@ -150,7 +151,12 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   private makefiles: MakefileInfo[] = [];
   private variableSelections: VariableSelectionState = {};
   private variablePresets: VariablePresetValues = {};
-  private filterQuery: string = '';
+  private searchOptions: SearchOptions = {
+    query: '',
+    caseSensitive: false,
+    wholeWord: false,
+    useRegex: false,
+  };
 
   constructor(private discovery: MakefileDiscovery) {
     // Listen for makefile changes
@@ -168,25 +174,23 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   }
 
   /**
-   * Set the filter query and refresh the tree
+   * Set the search options and refresh the tree
    */
-  setFilter(query: string): void {
-    this.filterQuery = query.toLowerCase();
+  setSearchOptions(options: SearchOptions): void {
+    this.searchOptions = options;
     this.refresh();
-  }
-
-  /**
-   * Get the current filter query
-   */
-  getFilter(): string {
-    return this.filterQuery;
   }
 
   /**
    * Clear the filter and refresh the tree
    */
   clearFilter(): void {
-    this.filterQuery = '';
+    this.searchOptions = {
+      query: '',
+      caseSensitive: false,
+      wholeWord: false,
+      useRegex: false,
+    };
     this.refresh();
   }
 
@@ -194,7 +198,7 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
    * Check if the filter is active
    */
   private isFilterActive(): boolean {
-    return this.filterQuery.length > 0;
+    return this.searchOptions.query.length > 0;
   }
 
   /**
@@ -204,11 +208,33 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     if (!this.isFilterActive()) {
       return true;
     }
-    // Case-insensitive match against target name or description
-    return (
-      target.name.toLowerCase().includes(this.filterQuery) ||
-      (target.description?.toLowerCase().includes(this.filterQuery) ?? false)
-    );
+
+    const { query, caseSensitive, wholeWord, useRegex } = this.searchOptions;
+
+    // Build the search pattern
+    let pattern: RegExp;
+    try {
+      if (useRegex) {
+        pattern = new RegExp(query, caseSensitive ? '' : 'i');
+      } else if (wholeWord) {
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        pattern = new RegExp(`\\b${escaped}\\b`, caseSensitive ? '' : 'i');
+      } else {
+        const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        pattern = new RegExp(escaped, caseSensitive ? '' : 'i');
+      }
+    } catch {
+      // Invalid regex - fall back to simple includes
+      const searchQuery = caseSensitive ? query : query.toLowerCase();
+      const targetName = caseSensitive ? target.name : target.name.toLowerCase();
+      const targetDesc = caseSensitive
+        ? (target.description ?? '')
+        : (target.description?.toLowerCase() ?? '');
+      return targetName.includes(searchQuery) || targetDesc.includes(searchQuery);
+    }
+
+    // Match against target name or description
+    return pattern.test(target.name) || (target.description ? pattern.test(target.description) : false);
   }
 
   /**
