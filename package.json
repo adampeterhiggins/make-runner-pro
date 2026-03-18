@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.4.4",
+  "version": "1.4.5",
   "publisher": "make-runner-pro",
   "license": "MIT",
   "repository": {
@@ -174,7 +174,14 @@
             "**/vendor/**",
             "**/.git/**"
           ],
-          "description": "Glob patterns to exclude from Makefile discovery"
+          "description": "Base glob patterns to exclude from Makefile discovery"
+        },
+        "makeRunnerPro.ignorePatterns": {
+          "type": "array",
+          "default": [
+            "**/.context/**"
+          ],
+          "description": "Additional glob patterns to ignore in user or workspace settings, such as cloned repos under .context"
         },
         "makeRunnerPro.showCodeLens": {
           "type": "boolean",
