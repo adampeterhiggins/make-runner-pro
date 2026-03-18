@@ -4,6 +4,15 @@
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
   "version": "1.4.3",
   "publisher": "make-runner-pro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/adampeterhiggins/make-runner-pro.git"
+  },
+  "bugs": {
+    "url": "https://github.com/adampeterhiggins/make-runner-pro/issues"
+  },
+  "homepage": "https://github.com/adampeterhiggins/make-runner-pro#readme",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -201,7 +210,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package --allow-missing-repository --skip-license"
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
