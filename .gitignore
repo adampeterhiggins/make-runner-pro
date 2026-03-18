@@ -6,4 +6,4 @@ node_modules/
 .context/
 .claude/
 orchestra-postgres.mk
-
+.vscode/*
