@@ -33,12 +33,17 @@ check-version: check-version-$(VERSION)
 
 check-version-%:
 	@git rev-parse --git-dir >/dev/null 2>&1
-	@LATEST_TAG="$$(git tag --sort=-v:refname | head -n 1)"; \
+	@CURRENT_TAG="v$*"; \
+	CURRENT_TAG_COMMIT="$$(git rev-list -n 1 "$$CURRENT_TAG" 2>/dev/null || true)"; \
+	HEAD_COMMIT="$$(git rev-parse HEAD)"; \
+	LATEST_TAG="$$(git tag --sort=-v:refname | head -n 1)"; \
 	TAG_VERSION="$${LATEST_TAG#v}"; \
 	LATEST_VSIX_VERSION="$$(find . -maxdepth 1 -type f -name 'make-runner-pro-*.vsix' -print | sed -E 's|^\./make-runner-pro-([0-9]+\.[0-9]+\.[0-9]+)\.vsix$$|\1|' | sort -V | tail -n 1)"; \
 	LATEST_VERSION="$$(printf '%s\n%s\n' "$$TAG_VERSION" "$$LATEST_VSIX_VERSION" | awk 'NF' | sort -V | tail -n 1)"; \
 	if [ "$(FORCE)" = "1" ]; then \
 		echo "FORCE=1 set; skipping version gate (requested version: $*)"; \
+	elif [ -n "$$CURRENT_TAG_COMMIT" ] && [ "$$CURRENT_TAG_COMMIT" = "$$HEAD_COMMIT" ]; then \
+		echo "Current HEAD is already tagged as $$CURRENT_TAG; allowing retry for $*"; \
 	elif [ -z "$$LATEST_VERSION" ]; then \
 		echo "No existing tags or local VSIX builds found; version gate passed for $*"; \
 	else \
@@ -54,12 +59,17 @@ check-version-%:
 ensure-version:
 	@git rev-parse --git-dir >/dev/null 2>&1
 	@CURRENT_VERSION="$$(node -p 'require("./package.json").version')"; \
+	CURRENT_TAG="v$$CURRENT_VERSION"; \
+	CURRENT_TAG_COMMIT="$$(git rev-list -n 1 "$$CURRENT_TAG" 2>/dev/null || true)"; \
+	HEAD_COMMIT="$$(git rev-parse HEAD)"; \
 	LATEST_TAG="$$(git tag --sort=-v:refname | head -n 1)"; \
 	TAG_VERSION="$${LATEST_TAG#v}"; \
 	LATEST_VSIX_VERSION="$$(find . -maxdepth 1 -type f -name 'make-runner-pro-*.vsix' -print | sed -E 's|^\./make-runner-pro-([0-9]+\.[0-9]+\.[0-9]+)\.vsix$$|\1|' | sort -V | tail -n 1)"; \
 	LATEST_VERSION="$$(printf '%s\n%s\n' "$$TAG_VERSION" "$$LATEST_VSIX_VERSION" | awk 'NF' | sort -V | tail -n 1)"; \
 	if [ "$(FORCE)" = "1" ]; then \
 		echo "FORCE=1 set; skipping version gate (current version: $$CURRENT_VERSION)"; \
+	elif [ -n "$$CURRENT_TAG_COMMIT" ] && [ "$$CURRENT_TAG_COMMIT" = "$$HEAD_COMMIT" ]; then \
+		echo "Current HEAD is already tagged as $$CURRENT_TAG; allowing retry for $$CURRENT_VERSION"; \
 	elif [ -z "$$LATEST_VERSION" ]; then \
 		echo "No existing tags or local VSIX builds found; version gate passed for $$CURRENT_VERSION"; \
 	else \
