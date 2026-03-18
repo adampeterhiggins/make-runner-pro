@@ -39,7 +39,11 @@ check-version-%:
 	LATEST_TAG="$$(git tag --sort=-v:refname | head -n 1)"; \
 	TAG_VERSION="$${LATEST_TAG#v}"; \
 	LATEST_VSIX_VERSION="$$(find . -maxdepth 1 -type f -name 'make-runner-pro-*.vsix' -print | sed -E 's|^\./make-runner-pro-([0-9]+\.[0-9]+\.[0-9]+)\.vsix$$|\1|' | sort -V | tail -n 1)"; \
-	LATEST_VERSION="$$(printf '%s\n%s\n' "$$TAG_VERSION" "$$LATEST_VSIX_VERSION" | awk 'NF' | sort -V | tail -n 1)"; \
+	if [ -n "$$TAG_VERSION" ]; then \
+		LATEST_VERSION="$$TAG_VERSION"; \
+	else \
+		LATEST_VERSION="$$LATEST_VSIX_VERSION"; \
+	fi; \
 	if [ "$(FORCE)" = "1" ]; then \
 		echo "FORCE=1 set; skipping version gate (requested version: $*)"; \
 	elif [ -n "$$CURRENT_TAG_COMMIT" ] && [ "$$CURRENT_TAG_COMMIT" = "$$HEAD_COMMIT" ]; then \
@@ -65,7 +69,11 @@ ensure-version:
 	LATEST_TAG="$$(git tag --sort=-v:refname | head -n 1)"; \
 	TAG_VERSION="$${LATEST_TAG#v}"; \
 	LATEST_VSIX_VERSION="$$(find . -maxdepth 1 -type f -name 'make-runner-pro-*.vsix' -print | sed -E 's|^\./make-runner-pro-([0-9]+\.[0-9]+\.[0-9]+)\.vsix$$|\1|' | sort -V | tail -n 1)"; \
-	LATEST_VERSION="$$(printf '%s\n%s\n' "$$TAG_VERSION" "$$LATEST_VSIX_VERSION" | awk 'NF' | sort -V | tail -n 1)"; \
+	if [ -n "$$TAG_VERSION" ]; then \
+		LATEST_VERSION="$$TAG_VERSION"; \
+	else \
+		LATEST_VERSION="$$LATEST_VSIX_VERSION"; \
+	fi; \
 	if [ "$(FORCE)" = "1" ]; then \
 		echo "FORCE=1 set; skipping version gate (current version: $$CURRENT_VERSION)"; \
 	elif [ -n "$$CURRENT_TAG_COMMIT" ] && [ "$$CURRENT_TAG_COMMIT" = "$$HEAD_COMMIT" ]; then \
