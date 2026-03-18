@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "publisher": "make-runner-pro",
   "engines": {
     "vscode": "^1.80.0"
@@ -201,7 +201,7 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package"
+    "package": "vsce package --allow-missing-repository --skip-license"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
