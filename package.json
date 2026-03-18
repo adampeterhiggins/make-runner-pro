@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.2.6",
+  "version": "1.4.2",
   "publisher": "make-runner-pro",
   "engines": {
     "vscode": "^1.80.0"
@@ -182,9 +182,18 @@
     "languages": [
       {
         "id": "makefile",
-        "aliases": ["Makefile", "make"],
-        "extensions": [".mk"],
-        "filenames": ["Makefile", "makefile", "GNUmakefile"]
+        "aliases": [
+          "Makefile",
+          "make"
+        ],
+        "extensions": [
+          ".mk"
+        ],
+        "filenames": [
+          "Makefile",
+          "makefile",
+          "GNUmakefile"
+        ]
       }
     ]
   },
@@ -201,6 +210,3 @@
     "typescript": "^5.3.0"
   }
 }
-
-
-

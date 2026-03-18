@@ -109,9 +109,26 @@ The extension detects required variables through several patterns:
 
 Issues and pull requests are welcome!
 
+## Development
+
+For the local Cursor extension workflow:
+
+```bash
+make cursor-install
+```
+
+That target mirrors the `db-inspector` setup:
+- bumps `package.json` and `package-lock.json` if the current version is not ahead of the latest git tag or local VSIX version
+- packages the extension into a VSIX
+- commits with the version number as the default commit message
+- tags the commit as `v<version>`
+- reinstalls the VSIX into Cursor and verifies the installed version
+
+Useful flags:
+- `YES=1` skips interactive prompts
+- `FORCE=1` bypasses the version gate for a forced rebuild/reinstall
+
 ## License
 
 MIT
-
-
 
