@@ -150,6 +150,7 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   private makefiles: MakefileInfo[] = [];
   private variableSelections: VariableSelectionState = {};
   private variablePresets: VariablePresetValues = {};
+  private filterQuery: string = '';
 
   constructor(private discovery: MakefileDiscovery) {
     // Listen for makefile changes
@@ -164,6 +165,52 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
 
   refresh(): void {
     this._onDidChangeTreeData.fire();
+  }
+
+  /**
+   * Set the filter query and refresh the tree
+   */
+  setFilter(query: string): void {
+    this.filterQuery = query.toLowerCase();
+    this.refresh();
+  }
+
+  /**
+   * Clear the filter and refresh the tree
+   */
+  clearFilter(): void {
+    this.filterQuery = '';
+    this.refresh();
+  }
+
+  /**
+   * Get the current filter query
+   */
+  getFilter(): string {
+    return this.filterQuery;
+  }
+
+  /**
+   * Check if a target matches the current filter
+   */
+  private targetMatchesFilter(target: MakeTarget): boolean {
+    if (!this.filterQuery) {
+      return true;
+    }
+    return (
+      target.name.toLowerCase().includes(this.filterQuery) ||
+      (target.description?.toLowerCase().includes(this.filterQuery) ?? false)
+    );
+  }
+
+  /**
+   * Check if a makefile has any targets matching the filter
+   */
+  private makefileHasMatchingTargets(makefile: MakefileInfo): boolean {
+    if (!this.filterQuery) {
+      return true;
+    }
+    return makefile.targets.some(t => this.targetMatchesFilter(t));
   }
 
   getTreeItem(element: MakeTreeItem): vscode.TreeItem {
@@ -323,13 +370,25 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
         ];
       }
 
-      // If only one makefile, expand it by default
-      const collapsedState =
-        this.makefiles.length === 1
-          ? vscode.TreeItemCollapsibleState.Expanded
-          : vscode.TreeItemCollapsibleState.Collapsed;
+      const filteredMakefiles = this.filterQuery
+        ? this.makefiles.filter(mf => this.makefileHasMatchingTargets(mf))
+        : this.makefiles;
 
-      return this.makefiles.map(
+      if (filteredMakefiles.length === 0) {
+        return [
+          new MakeTreeItem(
+            'No matching targets',
+            vscode.TreeItemCollapsibleState.None
+          ),
+        ];
+      }
+
+      const shouldExpand = filteredMakefiles.length === 1 || this.filterQuery;
+      const collapsedState = shouldExpand
+        ? vscode.TreeItemCollapsibleState.Expanded
+        : vscode.TreeItemCollapsibleState.Collapsed;
+
+      return filteredMakefiles.map(
         (mf) =>
           new MakeTreeItem(mf.relativePath, collapsedState, mf)
       );
@@ -365,12 +424,16 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
 
     // Show targets for a makefile
     if (element.makefileInfo && !element.target) {
-      const targets = element.makefileInfo.targets;
+      let targets = element.makefileInfo.targets;
+
+      if (this.filterQuery) {
+        targets = targets.filter(t => this.targetMatchesFilter(t));
+      }
 
       if (targets.length === 0) {
         return [
           new MakeTreeItem(
-            'No targets found',
+            this.filterQuery ? 'No matching targets' : 'No targets found',
             vscode.TreeItemCollapsibleState.None
           ),
         ];
@@ -417,6 +480,5 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     this._onDidChangeTreeData.dispose();
   }
 }
-
 
 
