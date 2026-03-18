@@ -52,7 +52,8 @@ Configure via VS Code settings:
 |---------|---------|-------------|
 | `makeRunnerPro.makeExecutable` | `"make"` | Path to the make executable |
 | `makeRunnerPro.filePatterns` | See below | Glob patterns for finding Makefiles |
-| `makeRunnerPro.excludePatterns` | `["**/node_modules/**", ...]` | Patterns to exclude |
+| `makeRunnerPro.excludePatterns` | `["**/node_modules/**", ...]` | Base patterns to exclude |
+| `makeRunnerPro.ignorePatterns` | `["**/.context/**"]` | Additional ignore rules you can set in user or workspace settings |
 | `makeRunnerPro.showCodeLens` | `true` | Show play buttons in Makefiles |
 | `makeRunnerPro.autoPromptVariables` | `true` | Auto-prompt for required variables |
 | `makeRunnerPro.extraArguments` | `[]` | Additional args to pass to make |
@@ -66,6 +67,17 @@ Default file patterns:
   "**/.*/[Mm]akefile",
   "**/.*/**/*.mk"
 ]
+```
+
+Example user or workspace settings:
+```json
+{
+  "makeRunnerPro.ignorePatterns": [
+    "**/.context/**",
+    "**/third_party/**",
+    "**/vendor/legacy/**"
+  ]
+}
 ```
 
 ## Variable Detection
@@ -131,4 +143,3 @@ Useful flags:
 ## License
 
 MIT
-

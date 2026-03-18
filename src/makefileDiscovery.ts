@@ -7,10 +7,12 @@ export class MakefileDiscovery {
   private cachedMakefiles: Map<string, MakefileInfo> = new Map();
   private _onMakefilesChanged = new vscode.EventEmitter<void>();
   readonly onMakefilesChanged = this._onMakefilesChanged.event;
+  private configWatcher?: vscode.Disposable;
 
   constructor() {
     this.parser = new MakefileParser();
     this.setupFileWatcher();
+    this.setupConfigurationWatcher();
   }
 
   private setupFileWatcher(): void {
@@ -53,29 +55,62 @@ export class MakefileDiscovery {
     this._onMakefilesChanged.fire();
   }
 
-  /**
-   * Discover all Makefiles in the workspace
-   */
-  async discoverMakefiles(): Promise<MakefileInfo[]> {
+  private setupConfigurationWatcher(): void {
+    this.configWatcher = vscode.workspace.onDidChangeConfiguration((event) => {
+      if (
+        event.affectsConfiguration('makeRunnerPro.filePatterns') ||
+        event.affectsConfiguration('makeRunnerPro.excludePatterns') ||
+        event.affectsConfiguration('makeRunnerPro.ignorePatterns')
+      ) {
+        this.invalidateCache();
+      }
+    });
+  }
+
+  private getDiscoveryPatterns(): string[] {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
-    const patterns = config.get<string[]>('filePatterns', [
+    return config.get<string[]>('filePatterns', [
       '**/[Mm]akefile',
       '**/*.mk',
       '**/GNUmakefile',
     ]);
+  }
+
+  private getIgnorePatterns(): string[] {
+    const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const excludePatterns = config.get<string[]>('excludePatterns', [
       '**/node_modules/**',
       '**/vendor/**',
       '**/.git/**',
     ]);
+    const ignorePatterns = config.get<string[]>('ignorePatterns', [
+      '**/.context/**',
+    ]);
+
+    return [...new Set([...excludePatterns, ...ignorePatterns])].filter(Boolean);
+  }
+
+  private buildExcludeGlob(patterns: string[]): string | undefined {
+    if (patterns.length === 0) {
+      return undefined;
+    }
+
+    return patterns.length === 1 ? patterns[0] : `{${patterns.join(',')}}`;
+  }
+
+  /**
+   * Discover all Makefiles in the workspace
+   */
+  async discoverMakefiles(): Promise<MakefileInfo[]> {
+    const patterns = this.getDiscoveryPatterns();
+    const excludePatterns = this.getIgnorePatterns();
+    const excludeGlob = this.buildExcludeGlob(excludePatterns);
 
     const makefiles: MakefileInfo[] = [];
     const foundUris = new Set<string>();
 
     for (const pattern of patterns) {
       try {
-        // Create exclude pattern string for findFiles
-        const excludeGlob = `{${excludePatterns.join(',')}}`;
         const uris = await vscode.workspace.findFiles(pattern, excludeGlob);
 
         for (const uri of uris) {
@@ -137,9 +172,9 @@ export class MakefileDiscovery {
   }
 
   dispose(): void {
+    this.configWatcher?.dispose();
     this._onMakefilesChanged.dispose();
   }
 }
-
 
 
