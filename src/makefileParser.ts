@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { MakeTarget, VariableInfo, MakefileInfo } from './types';
 
 interface RecursiveMakeInvocation {
-  assignedVariables: Set<string>;
+  assignedValues: Map<string, string>;
   targetNames: string[];
 }
 
@@ -47,6 +47,7 @@ export class MakefileParser {
         explicitDependencies,
         recipeInvocations,
         requiredVariableCache,
+        new Map<string, string>(),
         new Set<string>()
       );
     }
@@ -248,7 +249,7 @@ export class MakefileParser {
   private extractRecursiveMakeInvocation(line: string): RecursiveMakeInvocation {
     const cleanLine = line.trim().replace(/^[@+ -]+/, '').trim();
     const invocation: RecursiveMakeInvocation = {
-      assignedVariables: new Set<string>(),
+      assignedValues: new Map<string, string>(),
       targetNames: [],
     };
 
@@ -286,7 +287,9 @@ export class MakefileParser {
 
       const assignmentMatch = /^([A-Za-z_][A-Za-z0-9_]*)[:?+]?=/.exec(token);
       if (assignmentMatch) {
-        invocation.assignedVariables.add(assignmentMatch[1]);
+        const variableName = assignmentMatch[1];
+        const rawValue = token.slice(assignmentMatch[0].length);
+        invocation.assignedValues.set(variableName, rawValue);
         continue;
       }
 
@@ -326,23 +329,30 @@ export class MakefileParser {
     explicitDependencies: Map<string, string[]>,
     recipeInvocations: Map<string, RecursiveMakeInvocation[]>,
     requiredVariableCache: Map<string, VariableInfo[]>,
+    inheritedAssignments: Map<string, string>,
     visiting: Set<string>
   ): VariableInfo[] {
-    if (requiredVariableCache.has(target.name)) {
-      return [...(requiredVariableCache.get(target.name) ?? [])];
+    const cacheKey = this.getRequiredVariableCacheKey(target.name, inheritedAssignments);
+    if (requiredVariableCache.has(cacheKey)) {
+      return [...(requiredVariableCache.get(cacheKey) ?? [])];
     }
 
-    if (visiting.has(target.name)) {
+    if (visiting.has(cacheKey)) {
       return [];
     }
 
-    visiting.add(target.name);
-    const directRequiredVariables = this.findDirectRequiredVariables(lines, target, definedVariables);
+    visiting.add(cacheKey);
+    const directRequiredVariables = this.findDirectRequiredVariables(
+      lines,
+      target,
+      definedVariables,
+      inheritedAssignments
+    );
     const foundVars = new Set(directRequiredVariables.map((variable) => variable.name));
 
     const collectFromDependency = (
       dependencyName: string,
-      assignedVariables: Set<string>,
+      dependencyAssignments: Map<string, string>,
       visited: Set<string>
     ) => {
       if (visited.has(dependencyName)) {
@@ -355,6 +365,11 @@ export class MakefileParser {
       }
 
       visited.add(dependencyName);
+      const mergedAssignments = new Map(inheritedAssignments);
+      for (const [name, value] of dependencyAssignments) {
+        mergedAssignments.set(name, value);
+      }
+
       const dependencyVariables = this.findRequiredVariables(
         lines,
         dependencyTarget,
@@ -363,11 +378,12 @@ export class MakefileParser {
         explicitDependencies,
         recipeInvocations,
         requiredVariableCache,
+        mergedAssignments,
         visiting
       );
 
       for (const variable of dependencyVariables) {
-        if (assignedVariables.has(variable.name) || foundVars.has(variable.name)) {
+        if (dependencyAssignments.has(variable.name) || foundVars.has(variable.name)) {
           continue;
         }
 
@@ -379,28 +395,45 @@ export class MakefileParser {
     const visited = new Set<string>([target.name]);
     const directDependencies = explicitDependencies.get(target.name) ?? [];
     for (const dependencyName of directDependencies) {
-      collectFromDependency(dependencyName, new Set<string>(), visited);
+      collectFromDependency(dependencyName, new Map<string, string>(), visited);
     }
 
     const inferredInvocations = recipeInvocations.get(target.name) ?? [];
     for (const invocation of inferredInvocations) {
       for (const dependencyName of invocation.targetNames) {
-        collectFromDependency(dependencyName, invocation.assignedVariables, visited);
+        collectFromDependency(dependencyName, invocation.assignedValues, visited);
       }
     }
 
-    visiting.delete(target.name);
-    requiredVariableCache.set(target.name, [...directRequiredVariables]);
+    visiting.delete(cacheKey);
+    requiredVariableCache.set(cacheKey, [...directRequiredVariables]);
     return directRequiredVariables;
+  }
+
+  private getRequiredVariableCacheKey(
+    targetName: string,
+    inheritedAssignments: Map<string, string>
+  ): string {
+    if (inheritedAssignments.size === 0) {
+      return targetName;
+    }
+
+    const parts = [...inheritedAssignments.entries()]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([name, value]) => `${name}=${value}`);
+
+    return `${targetName}|${parts.join('|')}`;
   }
 
   private findDirectRequiredVariables(
     lines: string[],
     target: MakeTarget,
-    definedVariables: VariableInfo[]
+    definedVariables: VariableInfo[],
+    inheritedAssignments: Map<string, string>
   ): VariableInfo[] {
     const requiredVars: VariableInfo[] = [];
     const foundVars = new Set<string>();
+    const definedVariableMap = new Map(definedVariables.map((variable) => [variable.name, variable]));
 
     const recipeRange = this.getRecipeRange(lines, target);
 
@@ -418,7 +451,8 @@ export class MakefileParser {
       let match;
       while ((match = ifndefRegex.exec(line)) !== null) {
         const varName = match[1];
-        if (!foundVars.has(varName)) {
+        const assignedValue = inheritedAssignments.get(varName);
+        if (!foundVars.has(varName) && !assignedValue) {
           foundVars.add(varName);
           requiredVars.push({
             name: varName,
@@ -460,31 +494,229 @@ export class MakefileParser {
 
     for (let i = recipeRange.start; i < recipeRange.end; i++) {
       const line = lines[i];
-      let match;
+      const activeVariableNames = this.collectActiveVariableReferences(
+        line,
+        definedVariableMap,
+        inheritedAssignments
+      );
 
-      while ((match = varRefRegex.exec(line)) !== null) {
-        const varName = match[1];
-        // Skip make built-in functions, automatic variables, and already found vars
-        // Note: We include variables defined in the makefile so users can override them
+      for (const varName of activeVariableNames) {
         if (
-          !makeFunctions.has(varName.toLowerCase()) &&
-          !autoVars.has(varName) &&
-          !foundVars.has(varName)
+          makeFunctions.has(varName.toLowerCase()) ||
+          autoVars.has(varName) ||
+          foundVars.has(varName)
         ) {
-          foundVars.add(varName);
-          // Include default value if variable is defined in the makefile
-          const definedVar = definedVariables.find(v => v.name === varName);
-          requiredVars.push({
-            name: varName,
-            defaultValue: definedVar?.defaultValue,
-            description: definedVar?.description,
-            line: i,
-          });
+          continue;
         }
+
+        foundVars.add(varName);
+        const definedVar = definedVariableMap.get(varName);
+        requiredVars.push({
+          name: varName,
+          defaultValue: definedVar?.defaultValue,
+          description: definedVar?.description,
+          line: i,
+        });
       }
-      varRefRegex.lastIndex = 0;
     }
 
     return requiredVars;
+  }
+
+  private collectActiveVariableReferences(
+    line: string,
+    definedVariables: Map<string, VariableInfo>,
+    inheritedAssignments: Map<string, string>
+  ): string[] {
+    const refs = new Set<string>();
+    this.evaluateMakeText(line, definedVariables, inheritedAssignments, refs, 'output');
+    return [...refs].filter((name) => !name.endsWith('_ACTIONS'));
+  }
+
+  private evaluateMakeText(
+    text: string,
+    definedVariables: Map<string, VariableInfo>,
+    inheritedAssignments: Map<string, string>,
+    refs: Set<string>,
+    context: 'output' | 'condition'
+  ): string {
+    let result = '';
+
+    for (let i = 0; i < text.length; i++) {
+      const current = text[i];
+      const next = text[i + 1];
+
+      if (current === '$' && (next === '(' || next === '{')) {
+        const closing = next === '(' ? ')' : '}';
+        const extracted = this.extractMakeExpression(text, i + 2, closing);
+        result += this.evaluateMakeExpression(
+          extracted.content,
+          definedVariables,
+          inheritedAssignments,
+          refs,
+          context
+        );
+        i = extracted.endIndex;
+        continue;
+      }
+
+      result += current;
+    }
+
+    return result;
+  }
+
+  private extractMakeExpression(
+    text: string,
+    startIndex: number,
+    closingChar: ')' | '}'
+  ): { content: string; endIndex: number } {
+    let depth = 1;
+    let content = '';
+
+    for (let i = startIndex; i < text.length; i++) {
+      const current = text[i];
+      const next = text[i + 1];
+
+      if (current === '$' && (next === '(' || next === '{')) {
+        depth += 1;
+        content += current;
+        continue;
+      }
+
+      if (current === closingChar) {
+        depth -= 1;
+        if (depth === 0) {
+          return { content, endIndex: i };
+        }
+      }
+
+      content += current;
+    }
+
+    return { content, endIndex: text.length - 1 };
+  }
+
+  private evaluateMakeExpression(
+    content: string,
+    definedVariables: Map<string, VariableInfo>,
+    inheritedAssignments: Map<string, string>,
+    refs: Set<string>,
+    context: 'output' | 'condition'
+  ): string {
+    const trimmed = content.trim();
+    const functionMatch = /^([A-Za-z][A-Za-z0-9-]*)\s+([\s\S]+)$/.exec(trimmed);
+    const makeFunctions = new Set([
+      'if', 'or', 'and', 'foreach', 'filter', 'filter-out', 'sort', 'word',
+      'wordlist', 'words', 'firstword', 'lastword', 'dir', 'notdir', 'suffix',
+      'basename', 'addsuffix', 'addprefix', 'join', 'wildcard', 'realpath',
+      'abspath', 'call', 'eval', 'origin', 'flavor', 'value', 'error', 'warning',
+      'info', 'shell', 'subst', 'patsubst', 'strip', 'findstring', 'file'
+    ]);
+
+    if (functionMatch) {
+      const functionName = functionMatch[1];
+      const args = this.splitMakeFunctionArgs(functionMatch[2]);
+
+      if (functionName === 'if') {
+        const conditionValue = this.evaluateMakeText(
+          args[0] ?? '',
+          definedVariables,
+          inheritedAssignments,
+          refs,
+          'condition'
+        ).trim();
+        const selectedBranch = conditionValue ? args[1] ?? '' : args[2] ?? '';
+        return this.evaluateMakeText(
+          selectedBranch,
+          definedVariables,
+          inheritedAssignments,
+          refs,
+          context
+        );
+      }
+
+      if (functionName === 'filter' || functionName === 'filter-out') {
+        const pattern = this.evaluateMakeText(
+          args[0] ?? '',
+          definedVariables,
+          inheritedAssignments,
+          refs,
+          'condition'
+        );
+        const text = this.evaluateMakeText(
+          args[1] ?? '',
+          definedVariables,
+          inheritedAssignments,
+          refs,
+          'condition'
+        );
+        const patterns = pattern.split(/\s+/).filter(Boolean);
+        const words = text.split(/\s+/).filter(Boolean);
+        const matches = words.filter((word) => patterns.includes(word));
+        const output = functionName === 'filter'
+          ? matches
+          : words.filter((word) => !patterns.includes(word));
+        return output.join(' ');
+      }
+
+      if (makeFunctions.has(functionName)) {
+        for (const arg of args) {
+          this.evaluateMakeText(arg, definedVariables, inheritedAssignments, refs, 'condition');
+        }
+        return '';
+      }
+    }
+
+    const variableName = trimmed;
+    const definedVariable = definedVariables.get(variableName);
+    const assignedValue = inheritedAssignments.get(variableName);
+
+    if (context === 'output' && assignedValue === undefined) {
+      refs.add(variableName);
+    } else if (!assignedValue && !definedVariable) {
+      refs.add(variableName);
+    }
+
+    const value = assignedValue ?? definedVariable?.defaultValue ?? '';
+    if (context === 'condition' && value.includes('$')) {
+      return this.evaluateMakeText(value, definedVariables, inheritedAssignments, refs, 'condition');
+    }
+
+    return value;
+  }
+
+  private splitMakeFunctionArgs(content: string): string[] {
+    const args: string[] = [];
+    let current = '';
+    let depth = 0;
+
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+      const next = content[i + 1];
+
+      if (char === '$' && (next === '(' || next === '{')) {
+        depth += 1;
+        current += char;
+        continue;
+      }
+
+      if ((char === ')' || char === '}') && depth > 0) {
+        depth -= 1;
+        current += char;
+        continue;
+      }
+
+      if (char === ',' && depth === 0) {
+        args.push(current.trim());
+        current = '';
+        continue;
+      }
+
+      current += char;
+    }
+
+    args.push(current.trim());
+    return args;
   }
 }
