@@ -530,7 +530,11 @@ export class MakefileParser {
   ): string[] {
     const refs = new Set<string>();
     this.evaluateMakeText(line, definedVariables, inheritedAssignments, refs, 'output');
-    return [...refs].filter((name) => !name.endsWith('_ACTIONS'));
+    return [...refs].filter((name) => !this.isInternalControlVariable(name));
+  }
+
+  private isInternalControlVariable(name: string): boolean {
+    return name.endsWith('_ACTIONS');
   }
 
   private evaluateMakeText(
@@ -674,7 +678,11 @@ export class MakefileParser {
 
     if (context === 'output' && assignedValue === undefined) {
       refs.add(variableName);
-    } else if (!assignedValue && !definedVariable) {
+    } else if (
+      context === 'condition' &&
+      assignedValue === undefined &&
+      !this.isInternalControlVariable(variableName)
+    ) {
       refs.add(variableName);
     }
 
