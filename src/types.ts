@@ -29,7 +29,7 @@ export interface VariablePromptResult {
 
 /**
  * Tracks which variables are selected for prompting per target
- * Key format: "makefilePath::targetName::varName"
+ * Key format: "workspaceRelativeMakefilePath::targetName::varName"
  */
 export interface VariableSelectionState {
   [key: string]: boolean;
@@ -37,7 +37,7 @@ export interface VariableSelectionState {
 
 /**
  * Stores preset values for variables per target
- * Key format: "makefilePath::targetName::varName"
+ * Key format: "workspaceRelativeMakefilePath::targetName::varName"
  */
 export interface VariablePresetValues {
   [key: string]: string;
