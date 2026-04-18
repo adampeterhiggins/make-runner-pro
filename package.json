@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.4.8",
+  "version": "1.5.0",
   "publisher": "make-runner-pro",
   "license": "MIT",
   "repository": {
@@ -201,12 +201,12 @@
         "makeRunnerPro.variableSelections": {
           "type": "object",
           "default": {},
-          "description": "Tracks which variables are selected for prompting per target"
+          "description": "Tracks which variables are selected for prompting per target. Keys use workspace-relative paths: '<relativeMakefilePath>::<target>::<var>'"
         },
         "makeRunnerPro.variablePresets": {
           "type": "object",
           "default": {},
-          "description": "Preset values for variables per target (won't prompt at runtime)"
+          "description": "Preset values for variables per target (won't prompt at runtime). Keys use workspace-relative paths: '<relativeMakefilePath>::<target>::<var>'"
         },
         "makeRunnerPro.extraArguments": {
           "type": "array",

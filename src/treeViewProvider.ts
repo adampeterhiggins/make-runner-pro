@@ -218,10 +218,45 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   }
 
   /**
-   * Get the selection key for a variable
+   * Get the selection key for a variable.
+   * Uses workspace-relative path so settings are portable across machines
+   * (e.g. Conductor worktrees, different clones, CI).
    */
   private getVariableKey(makefilePath: string, targetName: string, varName: string): string {
-    return `${makefilePath}::${targetName}::${varName}`;
+    const relativePath = vscode.workspace.asRelativePath(makefilePath, false);
+    return `${relativePath}::${targetName}::${varName}`;
+  }
+
+  /**
+   * Migrate legacy absolute-path keys to workspace-relative keys.
+   * Any key whose first segment is an absolute path is rewritten.
+   * Returns true if any key changed.
+   */
+  private migrateKeysToRelative<T>(store: { [k: string]: T }): { store: { [k: string]: T }; changed: boolean } {
+    const migrated: { [k: string]: T } = {};
+    let changed = false;
+    for (const [key, value] of Object.entries(store)) {
+      const sep = '::';
+      const firstIdx = key.indexOf(sep);
+      if (firstIdx === -1) {
+        migrated[key] = value;
+        continue;
+      }
+      const pathPart = key.slice(0, firstIdx);
+      const rest = key.slice(firstIdx + sep.length);
+      const isAbsolute = pathPart.startsWith('/') || /^[A-Za-z]:[\\/]/.test(pathPart);
+      if (!isAbsolute) {
+        migrated[key] = value;
+        continue;
+      }
+      const relativePath = vscode.workspace.asRelativePath(pathPart, false);
+      const newKey = `${relativePath}${sep}${rest}`;
+      if (newKey !== key) {
+        changed = true;
+      }
+      migrated[newKey] = value;
+    }
+    return { store: migrated, changed };
   }
 
   /**
@@ -261,7 +296,12 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   private loadVariableSelections(): void {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const selections = config.get<VariableSelectionState>('variableSelections', {});
-    this.variableSelections = { ...selections };
+    const { store, changed } = this.migrateKeysToRelative<boolean>({ ...selections });
+    this.variableSelections = store;
+    if (changed) {
+      // Fire-and-forget: persist migrated keys so absolute paths vanish from settings.json
+      void this.saveVariableSelections();
+    }
   }
 
   /**
@@ -279,7 +319,12 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
   private loadVariablePresets(): void {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const presets = config.get<VariablePresetValues>('variablePresets', {});
-    this.variablePresets = { ...presets };
+    const { store, changed } = this.migrateKeysToRelative<string>({ ...presets });
+    this.variablePresets = store;
+    if (changed) {
+      // Fire-and-forget: persist migrated keys so absolute paths vanish from settings.json
+      void this.saveVariablePresets();
+    }
   }
 
   /**
