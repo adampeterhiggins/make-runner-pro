@@ -180,9 +180,12 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'makeRunnerPro.openMakefile',
-      async (makefileUri: vscode.Uri) => {
-        const document = await vscode.workspace.openTextDocument(makefileUri);
-        await vscode.window.showTextDocument(document);
+      async (itemOrUri: MakeTreeItem | vscode.Uri) => {
+        const makefileUri = getMakefileUri(itemOrUri);
+        if (makefileUri) {
+          const document = await vscode.workspace.openTextDocument(makefileUri);
+          await vscode.window.showTextDocument(document);
+        }
       }
     )
   );
@@ -205,8 +208,9 @@ function getTargetCommandArgs(
   itemOrUri?: MakeTreeItem | vscode.Uri,
   targetName?: string
 ): { makefileUri: vscode.Uri; targetName: string } | undefined {
-  if (itemOrUri instanceof vscode.Uri && targetName) {
-    return { makefileUri: itemOrUri, targetName };
+  const makefileUri = getMakefileUri(itemOrUri);
+  if (makefileUri && targetName) {
+    return { makefileUri, targetName };
   }
 
   if (isTargetTreeItem(itemOrUri)) {
@@ -219,12 +223,31 @@ function getTargetCommandArgs(
   return undefined;
 }
 
+function getMakefileUri(itemOrUri?: MakeTreeItem | vscode.Uri): vscode.Uri | undefined {
+  if (itemOrUri instanceof vscode.Uri) {
+    return itemOrUri;
+  }
+
+  if (hasMakefileUri(itemOrUri)) {
+    return vscode.Uri.parse(itemOrUri.makefileUriString);
+  }
+
+  return undefined;
+}
+
 function isTargetTreeItem(item: MakeTreeItem | vscode.Uri | undefined): item is MakeTreeItem & {
   makefileUriString: string;
   targetName: string;
 } {
   const candidate = item as Partial<MakeTreeItem> | undefined;
   return typeof candidate?.makefileUriString === 'string' && typeof candidate.targetName === 'string';
+}
+
+function hasMakefileUri(item: MakeTreeItem | vscode.Uri | undefined): item is MakeTreeItem & {
+  makefileUriString: string;
+} {
+  const candidate = item as Partial<MakeTreeItem> | undefined;
+  return typeof candidate?.makefileUriString === 'string';
 }
 
 /**
