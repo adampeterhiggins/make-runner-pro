@@ -2,7 +2,7 @@
   "name": "make-runner-pro",
   "displayName": "Make Runner Pro",
   "description": "Advanced Makefile task runner with variable prompts, CodeLens buttons, and comprehensive file discovery",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "publisher": "make-runner-pro",
   "license": "MIT",
   "repository": {
@@ -62,6 +62,11 @@
         "command": "makeRunnerPro.runTargetWithArgs",
         "title": "Make: Run Target with Arguments",
         "icon": "$(play-circle)"
+      },
+      {
+        "command": "makeRunnerPro.dryRunTarget",
+        "title": "Make: Dry Run Target",
+        "icon": "$(preview)"
       },
       {
         "command": "makeRunnerPro.refresh",
@@ -130,6 +135,11 @@
           "command": "makeRunnerPro.runTargetWithArgs",
           "when": "view == makeTargets && viewItem == target",
           "group": "inline@2"
+        },
+        {
+          "command": "makeRunnerPro.dryRunTarget",
+          "when": "view == makeTargets && viewItem == target",
+          "group": "inline@3"
         },
         {
           "command": "makeRunnerPro.openMakefile",
