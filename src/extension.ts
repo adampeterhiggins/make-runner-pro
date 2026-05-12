@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { MakefileDiscovery } from './makefileDiscovery';
-import { MakeTreeViewProvider } from './treeViewProvider';
+import { MakeTreeItem, MakeTreeViewProvider } from './treeViewProvider';
 import { MakeCodeLensProvider } from './codeLensProvider';
 import { TargetRunner } from './targetRunner';
 import { MakeTarget } from './types';
@@ -65,9 +65,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'makeRunnerPro.runTarget',
-      async (makefileUri?: vscode.Uri, targetName?: string) => {
-        if (makefileUri && targetName) {
-          await targetRunner.runTarget(makefileUri, targetName);
+      async (itemOrUri?: MakeTreeItem | vscode.Uri, targetName?: string) => {
+        const targetArgs = getTargetCommandArgs(itemOrUri, targetName);
+        if (targetArgs) {
+          await targetRunner.runTarget(targetArgs.makefileUri, targetArgs.targetName);
         } else {
           // Show quick pick to select target
           await showTargetQuickPick(false);
@@ -79,9 +80,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'makeRunnerPro.runTargetWithArgs',
-      async (makefileUri?: vscode.Uri, targetName?: string) => {
-        if (makefileUri && targetName) {
-          await targetRunner.runTargetWithArgs(makefileUri, targetName);
+      async (itemOrUri?: MakeTreeItem | vscode.Uri, targetName?: string) => {
+        const targetArgs = getTargetCommandArgs(itemOrUri, targetName);
+        if (targetArgs) {
+          await targetRunner.runTargetWithArgs(targetArgs.makefileUri, targetArgs.targetName);
         } else {
           // Show quick pick to select target
           await showTargetQuickPick(true);
@@ -93,9 +95,10 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.commands.registerCommand(
       'makeRunnerPro.dryRunTarget',
-      async (makefileUri?: vscode.Uri, targetName?: string) => {
-        if (makefileUri && targetName) {
-          await targetRunner.dryRunTarget(makefileUri, targetName);
+      async (itemOrUri?: MakeTreeItem | vscode.Uri, targetName?: string) => {
+        const targetArgs = getTargetCommandArgs(itemOrUri, targetName);
+        if (targetArgs) {
+          await targetRunner.dryRunTarget(targetArgs.makefileUri, targetArgs.targetName);
         } else {
           // Show quick pick to select target
           await showTargetQuickPick(false, true);
@@ -196,6 +199,32 @@ export function activate(context: vscode.ExtensionContext): void {
 
   // Initial refresh
   treeViewProvider.refresh();
+}
+
+function getTargetCommandArgs(
+  itemOrUri?: MakeTreeItem | vscode.Uri,
+  targetName?: string
+): { makefileUri: vscode.Uri; targetName: string } | undefined {
+  if (itemOrUri instanceof vscode.Uri && targetName) {
+    return { makefileUri: itemOrUri, targetName };
+  }
+
+  if (isTargetTreeItem(itemOrUri)) {
+    return {
+      makefileUri: vscode.Uri.parse(itemOrUri.makefileUriString),
+      targetName: itemOrUri.targetName,
+    };
+  }
+
+  return undefined;
+}
+
+function isTargetTreeItem(item: MakeTreeItem | vscode.Uri | undefined): item is MakeTreeItem & {
+  makefileUriString: string;
+  targetName: string;
+} {
+  const candidate = item as Partial<MakeTreeItem> | undefined;
+  return typeof candidate?.makefileUriString === 'string' && typeof candidate.targetName === 'string';
 }
 
 /**
