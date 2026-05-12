@@ -17,6 +17,7 @@ Unlike other extensions, Make Runner Pro discovers:
 Run targets directly from the Makefile with inline play buttons:
 
 - **▶ Run** - Execute the target immediately
+- **Dry Run** - Run `make -n` to print the commands without executing them
 - **▶ Run with Args** - Prompt for variable values before running
 
 ### 📋 Sidebar Tree View
@@ -43,6 +44,7 @@ When running a target that requires variables (detected via `ifndef`/`$(error ..
 1. **From CodeLens**: Click the play button next to any target in a Makefile
 2. **From Sidebar**: Click on a target in the Make Runner sidebar
 3. **From Command Palette**: Run "Make: Run Target" and select from the list
+4. **Dry Run**: Run "Make: Dry Run Target" or use the Dry Run CodeLens/context action to preview `make -n`
 
 ### Configuration
 

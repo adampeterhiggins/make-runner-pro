@@ -54,6 +54,15 @@ export class MakeCodeLensProvider implements vscode.CodeLensProvider {
         })
       );
 
+      codeLenses.push(
+        new vscode.CodeLens(range, {
+          title: '$(preview) Dry Run',
+          command: 'makeRunnerPro.dryRunTarget',
+          arguments: [document.uri, target.name],
+          tooltip: `Preview 'make -n ${target.name}' without executing commands`,
+        })
+      );
+
       // If target has required variables, add a "Run with args" button
       if (target.requiredVariables.length > 0) {
         codeLenses.push(
@@ -103,6 +112,5 @@ export class MakeCodeLensProvider implements vscode.CodeLensProvider {
     this._onDidChangeCodeLenses.dispose();
   }
 }
-
 
 

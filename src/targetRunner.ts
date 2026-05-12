@@ -32,7 +32,8 @@ export class TargetRunner {
   async runTarget(
     makefileUri: vscode.Uri,
     targetName: string,
-    forcePrompt: boolean = false
+    forcePrompt: boolean = false,
+    dryRun: boolean = false
   ): Promise<void> {
     const makefileInfo = await this.discovery.getMakefileInfo(makefileUri);
     if (!makefileInfo) {
@@ -78,7 +79,7 @@ export class TargetRunner {
       variables = { ...variables, ...result };
     }
 
-    await this.executeTarget(makefileUri, targetName, variables);
+    await this.executeTarget(makefileUri, targetName, variables, dryRun);
   }
 
   /**
@@ -86,6 +87,13 @@ export class TargetRunner {
    */
   async runTargetWithArgs(makefileUri: vscode.Uri, targetName: string): Promise<void> {
     return this.runTarget(makefileUri, targetName, true);
+  }
+
+  /**
+   * Run a make target with -n to print commands without executing them
+   */
+  async dryRunTarget(makefileUri: vscode.Uri, targetName: string): Promise<void> {
+    return this.runTarget(makefileUri, targetName, false, true);
   }
 
   /**
@@ -142,7 +150,8 @@ export class TargetRunner {
   private async executeTarget(
     makefileUri: vscode.Uri,
     targetName: string,
-    variables: VariablePromptResult
+    variables: VariablePromptResult,
+    dryRun: boolean = false
   ): Promise<void> {
     const config = vscode.workspace.getConfiguration('makeRunnerPro');
     const makeExecutable = config.get<string>('makeExecutable', 'make');
@@ -159,6 +168,10 @@ export class TargetRunner {
 
     // Build the command
     const cmdParts: string[] = [makeExecutable];
+
+    if (dryRun) {
+      cmdParts.push('-n');
+    }
 
     // Always use -f with the makefile path (relative to workspace root)
     cmdParts.push('-f', makefilePath);
@@ -179,7 +192,7 @@ export class TargetRunner {
     const command = cmdParts.join(' ');
 
     // Create a new terminal for this run
-    const terminal = this.createTerminal(makefileUri, targetName);
+    const terminal = this.createTerminal(makefileUri, targetName, dryRun);
     terminal.show();
 
     // Run from the workspace root directory
@@ -193,7 +206,7 @@ export class TargetRunner {
   /**
    * Create a new terminal for running a make target
    */
-  private createTerminal(makefileUri: vscode.Uri, targetName: string): vscode.Terminal {
+  private createTerminal(makefileUri: vscode.Uri, targetName: string, dryRun: boolean = false): vscode.Terminal {
     const workspaceFolder = vscode.workspace.getWorkspaceFolder(makefileUri);
     const relativePath = workspaceFolder
       ? vscode.workspace.asRelativePath(makefileUri, false)
@@ -206,7 +219,7 @@ export class TargetRunner {
     this.terminalCounter++;
 
     const terminal = vscode.window.createTerminal({
-      name: `Make #${this.terminalCounter}: ${targetName}`,
+      name: `${dryRun ? 'Make Dry Run' : 'Make'} #${this.terminalCounter}: ${targetName}`,
       cwd,
     });
 
@@ -239,6 +252,5 @@ export class TargetRunner {
     this.terminals = [];
   }
 }
-
 
 

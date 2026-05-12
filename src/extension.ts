@@ -92,6 +92,20 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
+      'makeRunnerPro.dryRunTarget',
+      async (makefileUri?: vscode.Uri, targetName?: string) => {
+        if (makefileUri && targetName) {
+          await targetRunner.dryRunTarget(makefileUri, targetName);
+        } else {
+          // Show quick pick to select target
+          await showTargetQuickPick(false, true);
+        }
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
       'makeRunnerPro.runFromCodeLens',
       async (makefileUri: vscode.Uri, targetName: string, target: MakeTarget) => {
         // If target has required variables, always prompt
@@ -187,7 +201,7 @@ export function activate(context: vscode.ExtensionContext): void {
 /**
  * Show a quick pick to select a target from all discovered makefiles
  */
-async function showTargetQuickPick(forcePrompt: boolean): Promise<void> {
+async function showTargetQuickPick(forcePrompt: boolean, dryRun: boolean = false): Promise<void> {
   const makefiles = await discovery.discoverMakefiles();
 
   if (makefiles.length === 0) {
@@ -222,13 +236,15 @@ async function showTargetQuickPick(forcePrompt: boolean): Promise<void> {
   }
 
   const selected = await vscode.window.showQuickPick(items, {
-    placeHolder: 'Select a Make target to run',
+    placeHolder: dryRun ? 'Select a Make target to dry run' : 'Select a Make target to run',
     matchOnDescription: true,
     matchOnDetail: true,
   });
 
   if (selected) {
-    if (forcePrompt) {
+    if (dryRun) {
+      await targetRunner.dryRunTarget(selected.makefileUri, selected.targetName);
+    } else if (forcePrompt) {
       await targetRunner.runTargetWithArgs(selected.makefileUri, selected.targetName);
     } else {
       await targetRunner.runTarget(selected.makefileUri, selected.targetName);
@@ -239,5 +255,3 @@ async function showTargetQuickPick(forcePrompt: boolean): Promise<void> {
 export function deactivate(): void {
   // Cleanup is handled by disposables
 }
-
-
