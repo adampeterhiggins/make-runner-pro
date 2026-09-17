@@ -109,6 +109,23 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push(
     vscode.commands.registerCommand(
+      'makeRunnerPro.goToTarget',
+      async (itemOrUri?: MakeTreeItem | vscode.Uri, targetName?: string) => {
+        if (!itemOrUri && !targetName) {
+          await showTargetLocationQuickPick();
+          return;
+        }
+
+        const targetLocation = await getTargetLocation(itemOrUri, targetName);
+        if (targetLocation) {
+          await openMakefileAtLine(targetLocation.makefileUri, targetLocation.line);
+        }
+      }
+    )
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
       'makeRunnerPro.runFromCodeLens',
       async (makefileUri: vscode.Uri, targetName: string, target: MakeTarget) => {
         // If target has required variables, always prompt
@@ -204,6 +221,45 @@ export function activate(context: vscode.ExtensionContext): void {
   treeViewProvider.refresh();
 }
 
+async function getTargetLocation(
+  itemOrUri?: MakeTreeItem | vscode.Uri,
+  targetName?: string
+): Promise<{ makefileUri: vscode.Uri; line: number } | undefined> {
+  if (isTargetTreeItem(itemOrUri) && typeof itemOrUri.targetLine === 'number') {
+    return {
+      makefileUri: vscode.Uri.parse(itemOrUri.makefileUriString),
+      line: itemOrUri.targetLine,
+    };
+  }
+
+  const targetArgs = getTargetCommandArgs(itemOrUri, targetName);
+  if (!targetArgs) {
+    return undefined;
+  }
+
+  const makefileInfo = await discovery.getMakefileInfo(targetArgs.makefileUri);
+  const target = makefileInfo?.targets.find((t) => t.name === targetArgs.targetName);
+  if (!target) {
+    vscode.window.showErrorMessage(`Target '${targetArgs.targetName}' not found in ${targetArgs.makefileUri.fsPath}`);
+    return undefined;
+  }
+
+  return {
+    makefileUri: targetArgs.makefileUri,
+    line: target.line,
+  };
+}
+
+async function openMakefileAtLine(makefileUri: vscode.Uri, line: number): Promise<void> {
+  const document = await vscode.workspace.openTextDocument(makefileUri);
+  const range = new vscode.Range(line, 0, line, 0);
+  const editor = await vscode.window.showTextDocument(document, {
+    selection: range,
+    preview: false,
+  });
+  editor.revealRange(range, vscode.TextEditorRevealType.InCenterIfOutsideViewport);
+}
+
 function getTargetCommandArgs(
   itemOrUri?: MakeTreeItem | vscode.Uri,
   targetName?: string
@@ -238,6 +294,7 @@ function getMakefileUri(itemOrUri?: MakeTreeItem | vscode.Uri): vscode.Uri | und
 function isTargetTreeItem(item: MakeTreeItem | vscode.Uri | undefined): item is MakeTreeItem & {
   makefileUriString: string;
   targetName: string;
+  targetLine?: number;
 } {
   const candidate = item as Partial<MakeTreeItem> | undefined;
   return typeof candidate?.makefileUriString === 'string' && typeof candidate.targetName === 'string';
@@ -301,6 +358,50 @@ async function showTargetQuickPick(forcePrompt: boolean, dryRun: boolean = false
     } else {
       await targetRunner.runTarget(selected.makefileUri, selected.targetName);
     }
+  }
+}
+
+async function showTargetLocationQuickPick(): Promise<void> {
+  const makefiles = await discovery.discoverMakefiles();
+
+  if (makefiles.length === 0) {
+    vscode.window.showInformationMessage('No Makefiles found in workspace');
+    return;
+  }
+
+  interface TargetLocationQuickPickItem extends vscode.QuickPickItem {
+    makefileUri: vscode.Uri;
+    line: number;
+  }
+
+  const items: TargetLocationQuickPickItem[] = [];
+
+  for (const mf of makefiles) {
+    for (const target of mf.targets) {
+      items.push({
+        label: target.name,
+        description: mf.relativePath,
+        detail: target.description,
+        makefileUri: mf.uri,
+        line: target.line,
+        iconPath: new vscode.ThemeIcon('target'),
+      });
+    }
+  }
+
+  if (items.length === 0) {
+    vscode.window.showInformationMessage('No targets found in any Makefile');
+    return;
+  }
+
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: 'Select a Make target to open',
+    matchOnDescription: true,
+    matchOnDetail: true,
+  });
+
+  if (selected) {
+    await openMakefileAtLine(selected.makefileUri, selected.line);
   }
 }
 
