@@ -7,3 +7,7 @@ node_modules/
 .claude/
 -.mk
 .vscode/*
+.env
+.env.*
+*.pem
+*.key
