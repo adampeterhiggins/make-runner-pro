@@ -10,6 +10,7 @@ export class MakeTreeItem extends vscode.TreeItem {
   // Store simple string values for command arguments (avoids proxy issues)
   public readonly makefileUriString?: string;
   public readonly targetName?: string;
+  public readonly targetLine?: number;
   public readonly variableName?: string;
   public readonly variableDefaultValue?: string;
 
@@ -30,6 +31,7 @@ export class MakeTreeItem extends vscode.TreeItem {
     }
     if (target) {
       this.targetName = target.name;
+      this.targetLine = target.line;
     }
     if (variable) {
       this.variableName = variable.name;
@@ -525,5 +527,4 @@ export class MakeTreeViewProvider implements vscode.TreeDataProvider<MakeTreeIte
     this._onDidChangeTreeData.dispose();
   }
 }
-
 
