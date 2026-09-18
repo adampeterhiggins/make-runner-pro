@@ -5,7 +5,6 @@ node_modules/
 .DS_Store
 .context/
 .claude/
--.mk
 .vscode/*
 .env
 .env.*
